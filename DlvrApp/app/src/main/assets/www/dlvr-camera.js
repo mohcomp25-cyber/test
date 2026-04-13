@@ -138,7 +138,7 @@ async function startCam(deviceId){
     catch{toast('تعذّر الوصول للكاميرا','bad');return;}
   }
 
-  const v=document.getElementById('vid');v.srcObject=stream;v.style.display='block';
+  const v=document.getElementById('vid');v.srcObject=stream;v.play().catch(()=>{});v.style.display='block';
   document.getElementById('noCam').style.display='none';
   document.getElementById('shutter').disabled=false;
   document.getElementById('camZone').classList.add('scanning');

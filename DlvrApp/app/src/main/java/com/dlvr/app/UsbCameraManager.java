@@ -10,10 +10,13 @@ import android.graphics.Rect;
 import android.graphics.YuvImage;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Base64;
 import android.util.Log;
+
+import androidx.fragment.app.FragmentActivity;
 
 import com.herohan.uvcapp.CameraHelper;
 import com.herohan.uvcapp.ICameraHelper;
@@ -31,6 +34,7 @@ public class UsbCameraManager {
     private static final long FRAME_INTERVAL_MS = 66;
 
     private final Context context;
+    private final FragmentActivity activity;
     private final Handler mainHandler;
     private final FrameCallback callback;
 
@@ -64,15 +68,20 @@ public class UsbCameraManager {
         }
     };
 
-    public UsbCameraManager(Context context, FrameCallback callback) {
-        this.context = context;
+    public UsbCameraManager(FragmentActivity activity, FrameCallback callback) {
+        this.context = activity;
+        this.activity = activity;
         this.callback = callback;
         this.mainHandler = new Handler(Looper.getMainLooper());
 
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_USB_PERMISSION);
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
-        context.registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            context.registerReceiver(usbReceiver, filter);
+        }
     }
 
     public boolean isUsbCameraAvailable() {
@@ -129,14 +138,21 @@ public class UsbCameraManager {
 
     private void openCamera(UsbDevice device) {
         currentDevice = device;
+        Log.d(TAG, "Opening camera: " + getDeviceLabel(device));
         try {
-            if (cameraHelper != null) cameraHelper.closeCamera();
+            if (cameraHelper != null) {
+                try { cameraHelper.closeCamera(); } catch (Exception ignored) {}
+                cameraHelper = null;
+            }
 
             cameraHelper = new CameraHelper();
             cameraHelper.setStateCallback(new ICameraHelper.StateCallback() {
-                @Override public void onAttach(UsbDevice device) { cameraHelper.selectDevice(device); }
+                @Override public void onAttach(UsbDevice device) {
+                    Log.d(TAG, "onAttach: " + device.getDeviceName());
+                    try { cameraHelper.selectDevice(device); } catch (Exception e) { Log.e(TAG, "selectDevice error", e); }
+                }
                 @Override public void onDeviceOpen(UsbDevice device, boolean isFirstOpen) {
-                    // اختار أفضل دقة من القائمة المدعومة
+                    Log.d(TAG, "onDeviceOpen");
                     try {
                         List<com.serenegiant.usb.Size> sizes = cameraHelper.getSupportedSizeList();
                         com.serenegiant.usb.Size best = null;
@@ -147,29 +163,35 @@ public class UsbCameraManager {
                                 int diff = Math.abs(s.width * s.height - target);
                                 if (diff < bestDiff) { bestDiff = diff; best = s; }
                             }
+                            Log.d(TAG, "Best size: " + best.width + "x" + best.height);
                         }
                         if (best != null) cameraHelper.setPreviewSize(best);
                     } catch (Exception e) { Log.e(TAG, "setPreviewSize error", e); }
-                    cameraHelper.openCamera();
+                    try { cameraHelper.openCamera(); } catch (Exception e) { Log.e(TAG, "openCamera error", e); }
                 }
                 @Override public void onCameraOpen(UsbDevice device) {
-                    cameraHelper.startPreview();
-                    isStreaming = true;
-                    mainHandler.post(() -> callback.onCameraReady());
+                    Log.d(TAG, "onCameraOpen — starting preview");
+                    try {
+                        cameraHelper.startPreview();
+                        isStreaming = true;
+                        mainHandler.post(() -> callback.onCameraReady());
+                    } catch (Exception e) { Log.e(TAG, "startPreview error", e); }
                 }
-                @Override public void onCameraClose(UsbDevice device) { isStreaming = false; }
-                @Override public void onDeviceClose(UsbDevice device) {}
-                @Override public void onDetach(UsbDevice device) { isStreaming = false; }
-                @Override public void onCancel(UsbDevice device) {}
+                @Override public void onCameraClose(UsbDevice device) { isStreaming = false; Log.d(TAG, "onCameraClose"); }
+                @Override public void onDeviceClose(UsbDevice device) { Log.d(TAG, "onDeviceClose"); }
+                @Override public void onDetach(UsbDevice device) { isStreaming = false; Log.d(TAG, "onDetach"); }
+                @Override public void onCancel(UsbDevice device) { Log.d(TAG, "onCancel"); }
             });
 
             cameraHelper.setFrameCallback(frame -> {
-                if (!isStreaming) return;
+                if (!isStreaming || cameraHelper == null) return;
                 long now = System.currentTimeMillis();
                 if (now - lastFrameTime < FRAME_INTERVAL_MS) return;
                 lastFrameTime = now;
                 try {
-                    byte[] jpeg = nv21ToJpeg(frame, cameraHelper.getPreviewSize().width, cameraHelper.getPreviewSize().height);
+                    com.serenegiant.usb.Size sz = cameraHelper.getPreviewSize();
+                    if (sz == null) return;
+                    byte[] jpeg = nv21ToJpeg(frame, sz.width, sz.height);
                     if (jpeg != null) {
                         String b64 = Base64.encodeToString(jpeg, Base64.NO_WRAP);
                         mainHandler.post(() -> callback.onFrame(b64));
