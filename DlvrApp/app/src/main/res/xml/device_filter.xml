@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- UVC Video class (0x0E = 14) -->
-    <usb-device class="14" subclass="1" />
-    <usb-device class="14" subclass="2" />
-    <!-- Miscellaneous class with IAD (common for UVC) -->
-    <usb-device class="239" subclass="2" protocol="1" />
-</resources>
