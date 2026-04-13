@@ -27,7 +27,14 @@ android {
     }
 }
 
+androidComponents {
+    beforeVariants(selector().all()) {
+        it.enableAndroidTest = false
+        it.enableUnitTest = false
+    }
+}
+
 dependencies {
-    implementation("com.herohan:UVCCamera:1.0.3")
+    implementation(files("libs/UVCAndroid-1.0.11.aar"))
     implementation("androidx.appcompat:appcompat:1.6.1")
 }

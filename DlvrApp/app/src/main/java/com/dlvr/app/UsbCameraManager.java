@@ -28,7 +28,7 @@ import java.util.List;
 public class UsbCameraManager {
     private static final String TAG = "DLVR-USB";
     private static final String ACTION_USB_PERMISSION = "com.dlvr.app.USB_PERMISSION";
-    private static final long FRAME_INTERVAL_MS = 66; // ~15fps
+    private static final long FRAME_INTERVAL_MS = 66;
 
     private final Context context;
     private final Handler mainHandler;
@@ -50,22 +50,13 @@ public class UsbCameraManager {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             if (ACTION_USB_PERMISSION.equals(action)) {
-                synchronized (this) {
-                    UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
-                    if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
-                        if (device != null) {
-                            Log.d(TAG, "USB permission granted: " + device.getDeviceName());
-                            openCamera(device);
-                        }
-                    } else {
-                        Log.d(TAG, "USB permission denied");
-                    }
+                UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false) && device != null) {
+                    openCamera(device);
                 }
             } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
                 UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
-                if (device != null && currentDevice != null
-                        && device.getDeviceId() == currentDevice.getDeviceId()) {
-                    Log.d(TAG, "USB camera detached");
+                if (device != null && currentDevice != null && device.getDeviceId() == currentDevice.getDeviceId()) {
                     stopCamera();
                     callback.onCameraDisconnected();
                 }
@@ -85,20 +76,15 @@ public class UsbCameraManager {
     }
 
     public boolean isUsbCameraAvailable() {
-        List<UsbDevice> cameras = getUvcDevices();
-        return !cameras.isEmpty();
+        return !getUvcDevices().isEmpty();
     }
 
     public List<UsbDevice> getUvcDevices() {
         List<UsbDevice> result = new ArrayList<>();
         UsbManager usbManager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
         if (usbManager == null) return result;
-
-        HashMap<String, UsbDevice> deviceList = usbManager.getDeviceList();
-        for (UsbDevice device : deviceList.values()) {
-            if (isUvcDevice(device)) {
-                result.add(device);
-            }
+        for (UsbDevice device : usbManager.getDeviceList().values()) {
+            if (isUvcDevice(device)) result.add(device);
         }
         return result;
     }
@@ -119,178 +105,109 @@ public class UsbCameraManager {
 
     public void startCamera(String deviceId) {
         List<UsbDevice> devices = getUvcDevices();
-        if (devices.isEmpty()) {
-            Log.w(TAG, "No UVC devices found");
-            return;
-        }
+        if (devices.isEmpty()) return;
 
         UsbDevice target = null;
-
-        // لو محدد deviceId، دوّر عليه
         if (deviceId != null && !deviceId.isEmpty()) {
             for (UsbDevice d : devices) {
-                if (("usb_" + d.getDeviceId()).equals(deviceId)) {
-                    target = d;
-                    break;
-                }
+                if (("usb_" + d.getDeviceId()).equals(deviceId)) { target = d; break; }
             }
         }
+        if (target == null) target = devices.get(0);
 
-        // لو ما لقيناه، خذ أول واحد
-        if (target == null) {
-            target = devices.get(0);
-        }
-
-        // اطلب إذن USB
         UsbManager usbManager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
         if (usbManager == null) return;
 
         if (usbManager.hasPermission(target)) {
             openCamera(target);
         } else {
-            PendingIntent pi = PendingIntent.getBroadcast(
-                    context, 0, new Intent(ACTION_USB_PERMISSION),
-                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
+            PendingIntent pi = PendingIntent.getBroadcast(context, 0,
+                    new Intent(ACTION_USB_PERMISSION), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
             usbManager.requestPermission(target, pi);
         }
     }
 
     private void openCamera(UsbDevice device) {
         currentDevice = device;
-
         try {
-            if (cameraHelper != null) {
-                cameraHelper.closeCamera();
-            }
+            if (cameraHelper != null) cameraHelper.closeCamera();
 
             cameraHelper = new CameraHelper();
             cameraHelper.setStateCallback(new ICameraHelper.StateCallback() {
-                @Override
-                public void onAttach(UsbDevice device) {
-                    Log.d(TAG, "Camera attached: " + device.getDeviceName());
-                    cameraHelper.selectDevice(device);
-                }
-
-                @Override
-                public void onDeviceOpen(UsbDevice device, boolean isFirstOpen) {
-                    Log.d(TAG, "Camera opened");
-                    // حاول أعلى دقة ممكنة
+                @Override public void onAttach(UsbDevice device) { cameraHelper.selectDevice(device); }
+                @Override public void onDeviceOpen(UsbDevice device, boolean isFirstOpen) {
+                    // اختار أفضل دقة من القائمة المدعومة
                     try {
-                        cameraHelper.setPreviewSize(new com.serenegiant.usb.Size(1920, 1080));
-                    } catch (Exception e) {
-                        try {
-                            cameraHelper.setPreviewSize(new com.serenegiant.usb.Size(1280, 720));
-                        } catch (Exception e2) {
-                            try {
-                                cameraHelper.setPreviewSize(new com.serenegiant.usb.Size(640, 480));
-                            } catch (Exception e3) {
-                                Log.e(TAG, "Failed to set preview size", e3);
+                        List<com.serenegiant.usb.Size> sizes = cameraHelper.getSupportedSizeList();
+                        com.serenegiant.usb.Size best = null;
+                        if (sizes != null && !sizes.isEmpty()) {
+                            int target = 1280 * 720;
+                            int bestDiff = Integer.MAX_VALUE;
+                            for (com.serenegiant.usb.Size s : sizes) {
+                                int diff = Math.abs(s.width * s.height - target);
+                                if (diff < bestDiff) { bestDiff = diff; best = s; }
                             }
                         }
-                    }
+                        if (best != null) cameraHelper.setPreviewSize(best);
+                    } catch (Exception e) { Log.e(TAG, "setPreviewSize error", e); }
+                    cameraHelper.openCamera();
+                }
+                @Override public void onCameraOpen(UsbDevice device) {
                     cameraHelper.startPreview();
                     isStreaming = true;
                     mainHandler.post(() -> callback.onCameraReady());
                 }
-
-                @Override
-                public void onCameraOpen(UsbDevice device) {
-                    Log.d(TAG, "UVC camera stream started");
-                }
-
-                @Override
-                public void onCameraClose(UsbDevice device) {
-                    Log.d(TAG, "Camera closed");
-                    isStreaming = false;
-                }
-
-                @Override
-                public void onDeviceClose(UsbDevice device) {
-                    Log.d(TAG, "Device closed");
-                }
-
-                @Override
-                public void onDetach(UsbDevice device) {
-                    Log.d(TAG, "Device detached");
-                    isStreaming = false;
-                }
-
-                @Override
-                public void onCancel(UsbDevice device) {
-                    Log.d(TAG, "Cancelled");
-                }
+                @Override public void onCameraClose(UsbDevice device) { isStreaming = false; }
+                @Override public void onDeviceClose(UsbDevice device) {}
+                @Override public void onDetach(UsbDevice device) { isStreaming = false; }
+                @Override public void onCancel(UsbDevice device) {}
             });
 
             cameraHelper.setFrameCallback(frame -> {
                 if (!isStreaming) return;
-
                 long now = System.currentTimeMillis();
                 if (now - lastFrameTime < FRAME_INTERVAL_MS) return;
                 lastFrameTime = now;
-
                 try {
-                    byte[] jpegBytes = nv21ToJpeg(frame, cameraHelper.getPreviewSize().width,
-                            cameraHelper.getPreviewSize().height);
-                    if (jpegBytes != null) {
-                        String b64 = Base64.encodeToString(jpegBytes, Base64.NO_WRAP);
+                    byte[] jpeg = nv21ToJpeg(frame, cameraHelper.getPreviewSize().width, cameraHelper.getPreviewSize().height);
+                    if (jpeg != null) {
+                        String b64 = Base64.encodeToString(jpeg, Base64.NO_WRAP);
                         mainHandler.post(() -> callback.onFrame(b64));
                     }
-                } catch (Exception e) {
-                    Log.e(TAG, "Frame convert error", e);
-                }
+                } catch (Exception e) { Log.e(TAG, "Frame error", e); }
             }, UVCCamera.PIXEL_FORMAT_NV21);
 
-            cameraHelper.addDevice(device);
-
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to open camera", e);
-        }
+            cameraHelper.selectDevice(device);
+        } catch (Exception e) { Log.e(TAG, "Failed to open camera", e); }
     }
 
     public void stopCamera() {
         isStreaming = false;
         if (cameraHelper != null) {
-            try {
-                cameraHelper.stopPreview();
-                cameraHelper.closeCamera();
-            } catch (Exception e) {
-                Log.e(TAG, "Error stopping camera", e);
-            }
+            try { cameraHelper.stopPreview(); cameraHelper.closeCamera(); } catch (Exception ignored) {}
         }
         currentDevice = null;
     }
 
     public void destroy() {
         stopCamera();
-        try {
-            context.unregisterReceiver(usbReceiver);
-        } catch (Exception ignored) {}
+        try { context.unregisterReceiver(usbReceiver); } catch (Exception ignored) {}
     }
 
-    private byte[] nv21ToJpeg(ByteBuffer nv21Buffer, int width, int height) {
+    private byte[] nv21ToJpeg(ByteBuffer buf, int w, int h) {
         try {
-            byte[] nv21 = new byte[nv21Buffer.remaining()];
-            nv21Buffer.get(nv21);
-            YuvImage yuvImage = new YuvImage(nv21, ImageFormat.NV21, width, height, null);
+            byte[] nv21 = new byte[buf.remaining()];
+            buf.get(nv21);
+            YuvImage yuv = new YuvImage(nv21, ImageFormat.NV21, w, h, null);
             ByteArrayOutputStream out = new ByteArrayOutputStream();
-            yuvImage.compressToJpeg(new Rect(0, 0, width, height), 80, out);
+            yuv.compressToJpeg(new Rect(0, 0, w, h), 80, out);
             return out.toByteArray();
-        } catch (Exception e) {
-            Log.e(TAG, "NV21 to JPEG error", e);
-            return null;
-        }
+        } catch (Exception e) { return null; }
     }
 
     private boolean isUvcDevice(UsbDevice device) {
-        int cls = device.getDeviceClass();
-        int sub = device.getDeviceSubclass();
-        int proto = device.getDeviceProtocol();
-
-        // UVC Video class
-        if (cls == 14) return true;
-        // Miscellaneous with IAD (common for composite UVC devices)
-        if (cls == 239 && sub == 2 && proto == 1) return true;
-        // Check interfaces
+        if (device.getDeviceClass() == 14) return true;
+        if (device.getDeviceClass() == 239 && device.getDeviceSubclass() == 2 && device.getDeviceProtocol() == 1) return true;
         for (int i = 0; i < device.getInterfaceCount(); i++) {
             if (device.getInterface(i).getInterfaceClass() == 14) return true;
         }
@@ -299,11 +216,8 @@ public class UsbCameraManager {
 
     private String getDeviceLabel(UsbDevice device) {
         String name = device.getProductName();
-        if (name != null && !name.isEmpty()) return name;
-        return "USB Camera (" + device.getVendorId() + ":" + device.getProductId() + ")";
+        return (name != null && !name.isEmpty()) ? name : "USB Camera";
     }
 
-    private String escapeJson(String s) {
-        return s.replace("\\", "\\\\").replace("\"", "\\\"");
-    }
+    private String escapeJson(String s) { return s.replace("\\", "\\\\").replace("\"", "\\\""); }
 }

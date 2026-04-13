@@ -1,7 +1,8 @@
 package com.dlvr.app;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
-import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -12,6 +13,8 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -20,6 +23,7 @@ import java.io.InputStreamReader;
 
 public class MainActivity extends AppCompatActivity implements UsbCameraManager.FrameCallback {
     private static final String TAG = "DLVR";
+    private static final int CAMERA_PERMISSION_CODE = 100;
 
     private WebView webView;
     private UsbCameraManager usbCamera;
@@ -37,10 +41,17 @@ public class MainActivity extends AppCompatActivity implements UsbCameraManager.
                         | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                         | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
 
+        // اطلب إذن الكاميرا
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_CODE);
+        }
+
         // USB Camera Manager
         usbCamera = new UsbCameraManager(this, this);
 
-        // Load shim script from assets
+        // Load shim script
         shimScript = loadAsset("www/camera-shim.js");
 
         // WebView setup
@@ -51,12 +62,11 @@ public class MainActivity extends AppCompatActivity implements UsbCameraManager.
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setAllowFileAccess(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
 
         // JS Bridge
         webView.addJavascriptInterface(new DlvrJsBridge(this), "Android");
 
-        // WebView Client — inject shim before page JS runs
+        // Inject shim before page JS
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
@@ -68,7 +78,7 @@ public class MainActivity extends AppCompatActivity implements UsbCameraManager.
             }
         });
 
-        // Chrome Client — handle camera permission requests from WebView
+        // Grant camera permissions to WebView
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(PermissionRequest request) {
@@ -76,29 +86,7 @@ public class MainActivity extends AppCompatActivity implements UsbCameraManager.
             }
         });
 
-        // Load the web app
         webView.loadUrl("file:///android_asset/www/index.html");
-
-        // Handle USB intent if app was launched by USB attach
-        handleUsbIntent(getIntent());
-    }
-
-    @Override
-    protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        handleUsbIntent(intent);
-    }
-
-    private void handleUsbIntent(Intent intent) {
-        if (intent != null && "android.hardware.usb.action.USB_DEVICE_ATTACHED".equals(intent.getAction())) {
-            Log.d(TAG, "USB device attached via intent");
-            // Notify WebView about new device
-            runOnUiThread(() -> {
-                if (webView != null) {
-                    webView.evaluateJavascript("if(window._notifyDeviceChange)window._notifyDeviceChange()", null);
-                }
-            });
-        }
     }
 
     // === Called from DlvrJsBridge ===
@@ -123,7 +111,6 @@ public class MainActivity extends AppCompatActivity implements UsbCameraManager.
 
     @Override
     public void onFrame(String base64Jpeg) {
-        // Push frame to WebView — already on main thread
         if (webView != null) {
             webView.evaluateJavascript(
                     "if(window._nativeFrame)window._nativeFrame('" + base64Jpeg + "')", null);
@@ -132,7 +119,7 @@ public class MainActivity extends AppCompatActivity implements UsbCameraManager.
 
     @Override
     public void onCameraReady() {
-        Log.d(TAG, "USB camera ready, notifying WebView");
+        Log.d(TAG, "Camera ready");
         if (webView != null) {
             webView.evaluateJavascript(
                     "if(window._nativeUsbReady)window._nativeUsbReady()", null);
@@ -141,14 +128,12 @@ public class MainActivity extends AppCompatActivity implements UsbCameraManager.
 
     @Override
     public void onCameraDisconnected() {
-        Log.d(TAG, "USB camera disconnected, notifying WebView");
+        Log.d(TAG, "Camera disconnected");
         if (webView != null) {
             webView.evaluateJavascript(
                     "if(window._nativeUsbDisconnected)window._nativeUsbDisconnected()", null);
         }
     }
-
-    // === Lifecycle ===
 
     @Override
     public void onBackPressed() {
@@ -161,16 +146,10 @@ public class MainActivity extends AppCompatActivity implements UsbCameraManager.
 
     @Override
     protected void onDestroy() {
-        if (usbCamera != null) {
-            usbCamera.destroy();
-        }
-        if (webView != null) {
-            webView.destroy();
-        }
+        if (usbCamera != null) usbCamera.destroy();
+        if (webView != null) webView.destroy();
         super.onDestroy();
     }
-
-    // === Helpers ===
 
     private String loadAsset(String path) {
         try {
