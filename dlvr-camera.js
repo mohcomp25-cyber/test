@@ -14,9 +14,12 @@ const SCAN_MS=500;
 const COOLDOWN=6000;
 let cooldownUntil=0;
 
-const KEY_URL='dlvr_v2_url',KEY_BRANCH='dlvr_v2_branch',KEY_COUNT='dlvr_v2_count',KEY_BRANCH_NAME='dlvr_v2_branch_name',KEY_AUTO='dlvr_v2_auto',KEY_CAM='dlvr_v2_cam';
+const KEY_URL='dlvr_v2_url',KEY_BRANCH='dlvr_v2_branch',KEY_COUNT='dlvr_v2_count',KEY_BRANCH_NAME='dlvr_v2_branch_name',KEY_AUTO='dlvr_v2_auto',KEY_CAM='dlvr_v2_cam',KEY_IPCAM='dlvr_v2_ipcam';
 let sheetUrl=localStorage.getItem(KEY_URL)||'';
 let selectedCamId=localStorage.getItem(KEY_CAM)||'';
+let ipCamUrl=localStorage.getItem(KEY_IPCAM)||'';
+let ipCamMode=false;
+let ipCamImg=null;
 let branchNameLabel=localStorage.getItem(KEY_BRANCH_NAME)||'';
 let branchName=localStorage.getItem(KEY_BRANCH)||'';
 let count=parseInt(localStorage.getItem(KEY_COUNT)||'0');
@@ -57,8 +60,106 @@ if(sheetUrl)document.getElementById('urlIn').value=sheetUrl;
 if(branchName)document.getElementById('branchIn').value=branchName;
 if(localStorage.getItem(KEY_AUTO)==='true'){autoMode=true;updateModeUI();}
 
+// ══ IP CAMERA ════════════════════════════════════════
+function startIpCam(url){
+  ipCamMode=true;
+  const v=document.getElementById('vid');
+
+  // أنشئ img مخفي يستقبل MJPEG stream
+  if(ipCamImg){ipCamImg.src='';ipCamImg=null;}
+  ipCamImg=new Image();
+  ipCamImg.crossOrigin='anonymous';
+
+  // أنشئ canvas مخفي يرسم عليه الفريمات
+  const ipCanvas=document.createElement('canvas');
+  const ipCtx=ipCanvas.getContext('2d');
+
+  ipCamImg.onload=function(){
+    // أول فريم وصل — جهّز كل شي
+    ipCanvas.width=ipCamImg.naturalWidth||1280;
+    ipCanvas.height=ipCamImg.naturalHeight||720;
+
+    // ارسم على canvas وحوّله لـ stream للفيديو
+    function drawFrame(){
+      if(!ipCamMode)return;
+      ipCtx.drawImage(ipCamImg,0,0);
+      requestAnimationFrame(drawFrame);
+    }
+    drawFrame();
+
+    // حوّل canvas لـ MediaStream
+    try{
+      stream=ipCanvas.captureStream(15);
+      v.srcObject=stream;
+      v.style.display='block';
+      document.getElementById('noCam').style.display='none';
+      document.getElementById('shutter').disabled=false;
+      document.getElementById('camZone').classList.add('scanning');
+      toast('كاميرا IP متصلة','ok');
+      if(autoMode)startAutoScan();
+    }catch(e){
+      console.error('[DLVR] captureStream error:',e);
+      // fallback: عرض الصورة مباشرة
+      v.style.display='none';
+      ipCamImg.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;';
+      document.getElementById('camZone').appendChild(ipCamImg);
+      document.getElementById('noCam').style.display='none';
+      document.getElementById('shutter').disabled=false;
+      document.getElementById('camZone').classList.add('scanning');
+      toast('كاميرا IP (وضع صورة)','ok');
+      if(autoMode)startAutoScan();
+    }
+  };
+
+  ipCamImg.onerror=function(){
+    // لو MJPEG stream ما اشتغل، جرب كـ snapshot URL (يتحدث كل ثانية)
+    console.log('[DLVR] MJPEG failed, trying snapshot mode');
+    let snapshotInterval=null;
+    function loadSnapshot(){
+      const img2=new Image();
+      img2.crossOrigin='anonymous';
+      img2.onload=function(){
+        ipCanvas.width=img2.naturalWidth;
+        ipCanvas.height=img2.naturalHeight;
+        ipCtx.drawImage(img2,0,0);
+        if(!stream){
+          try{
+            stream=ipCanvas.captureStream(0);
+            v.srcObject=stream;v.style.display='block';
+            document.getElementById('noCam').style.display='none';
+            document.getElementById('shutter').disabled=false;
+            document.getElementById('camZone').classList.add('scanning');
+            toast('كاميرا IP (snapshot)','ok');
+            if(autoMode)startAutoScan();
+          }catch(e){console.error(e);}
+        }
+      };
+      img2.src=url+'?t='+Date.now();
+    }
+    loadSnapshot();
+    snapshotInterval=setInterval(()=>{if(ipCamMode)loadSnapshot();else clearInterval(snapshotInterval);},500);
+  };
+
+  ipCamImg.src=url;
+  console.log('[DLVR] IP camera URL:',url);
+}
+
+function stopIpCam(){
+  ipCamMode=false;
+  if(ipCamImg){ipCamImg.src='';ipCamImg.remove();ipCamImg=null;}
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+}
+
 // ══ CAMERA ═══════════════════════════════════════════
 async function startCam(deviceId){
+  // لو فيه IP camera محفوظة، استخدمها
+  if(ipCamUrl && !deviceId){
+    stopIpCam();
+    startIpCam(ipCamUrl);
+    return;
+  }
+
+  ipCamMode=false;
   const camId = deviceId || selectedCamId;
 
   // لو فيه stream قديم أوقفه
@@ -303,9 +404,12 @@ async function captureAuto(){
   flash();beep();
 
   const vid=document.getElementById('vid'),cv=document.getElementById('cv');
-  const maxW=900,ratio=Math.min(maxW/(vid.videoWidth||1280),1);
-  cv.width=Math.round((vid.videoWidth||1280)*ratio);cv.height=Math.round((vid.videoHeight||720)*ratio);
-  cv.getContext('2d').drawImage(vid,0,0,cv.width,cv.height);
+  const src=(ipCamMode&&ipCamImg&&ipCamImg.naturalWidth)?ipCamImg:vid;
+  const srcW=src.videoWidth||src.naturalWidth||1280;
+  const srcH=src.videoHeight||src.naturalHeight||720;
+  const maxW=900,ratio=Math.min(maxW/srcW,1);
+  cv.width=Math.round(srcW*ratio);cv.height=Math.round(srcH*ratio);
+  cv.getContext('2d').drawImage(src,0,0,cv.width,cv.height);
   const b64=cv.toDataURL('image/jpeg',0.8).split(',')[1];
   const b64Up=cv.toDataURL('image/jpeg',0.85).split(',')[1];
 
@@ -343,13 +447,17 @@ function showCooldown(ms){
 
 // MANUAL CAPTURE
 async function capture(){
-  if(!stream||busy)return;
+  if((!stream&&!ipCamMode)||busy)return;
   if(!branchName||!BRANCHES[branchName]){toast('أدخل رقم المنشأة أولاً','bad');setTimeout(()=>openAdmin(),800);return;}
   busy=true;flash();beep();
   const vid=document.getElementById('vid'),cv=document.getElementById('cv');
-  const maxW=900,ratio=Math.min(maxW/(vid.videoWidth||1280),1);
-  cv.width=Math.round((vid.videoWidth||1280)*ratio);cv.height=Math.round((vid.videoHeight||720)*ratio);
-  cv.getContext('2d').drawImage(vid,0,0,cv.width,cv.height);
+  // IP camera fallback: لو مافيه video stream، ارسم من الصورة مباشرة
+  const src=(ipCamMode&&ipCamImg&&ipCamImg.naturalWidth)?ipCamImg:vid;
+  const srcW=src.videoWidth||src.naturalWidth||1280;
+  const srcH=src.videoHeight||src.naturalHeight||720;
+  const maxW=900,ratio=Math.min(maxW/srcW,1);
+  cv.width=Math.round(srcW*ratio);cv.height=Math.round(srcH*ratio);
+  cv.getContext('2d').drawImage(src,0,0,cv.width,cv.height);
   const b64=cv.toDataURL('image/jpeg',0.8).split(',')[1];
   const b64Up=cv.toDataURL('image/jpeg',0.85).split(',')[1];
   document.getElementById('analyzing').classList.add('on');document.getElementById('shutter').disabled=true;
@@ -419,7 +527,7 @@ function onBrandTap(){
 // ADMIN
 function openAdmin(){document.getElementById('pinIn').value='';document.getElementById('pinErr').style.display='none';document.getElementById('pinWrap').style.display='block';document.getElementById('settingsDiv').style.display='none';document.getElementById('adminOverlay').classList.add('on');setTimeout(()=>document.getElementById('pinIn').focus(),350);}
 function closeAdmin(){document.getElementById('adminOverlay').classList.remove('on');}
-function checkPin(){const v=document.getElementById('pinIn').value;if(v.length<4)return;if(v===ADMIN_PIN){document.getElementById('pinWrap').style.display='none';document.getElementById('settingsDiv').style.display='block';document.getElementById('urlIn').value=sheetUrl;document.getElementById('branchIn').value=branchName;document.getElementById('branchNameIn').value=branchNameLabel;}else{document.getElementById('pinErr').style.display='block';document.getElementById('pinIn').value='';setTimeout(()=>document.getElementById('pinErr').style.display='none',2000);}}
+function checkPin(){const v=document.getElementById('pinIn').value;if(v.length<4)return;if(v===ADMIN_PIN){document.getElementById('pinWrap').style.display='none';document.getElementById('settingsDiv').style.display='block';document.getElementById('urlIn').value=sheetUrl;document.getElementById('branchIn').value=branchName;document.getElementById('branchNameIn').value=branchNameLabel;document.getElementById('ipCamIn').value=ipCamUrl;}else{document.getElementById('pinErr').style.display='block';document.getElementById('pinIn').value='';setTimeout(()=>document.getElementById('pinErr').style.display='none',2000);}}
 function saveSettings(){
   const url=document.getElementById('urlIn').value.trim(),branch=document.getElementById('branchIn').value.trim();
   if(!branch){toast('أدخل رقم المنشأة','bad');return;}
@@ -428,6 +536,10 @@ function saveSettings(){
   if(url){sheetUrl=url;localStorage.setItem(KEY_URL,sheetUrl);setConn(true);}
   branchName=branch;localStorage.setItem(KEY_BRANCH,branchName);
   const n=document.getElementById('branchNameIn').value.trim();if(n){branchNameLabel=n;localStorage.setItem(KEY_BRANCH_NAME,branchNameLabel);}
+  // IP Camera
+  const ipUrl=document.getElementById('ipCamIn').value.trim();
+  if(ipUrl){ipCamUrl=ipUrl;localStorage.setItem(KEY_IPCAM,ipCamUrl);stopIpCam();startIpCam(ipCamUrl);}
+  else if(ipCamUrl){ipCamUrl='';localStorage.removeItem(KEY_IPCAM);stopIpCam();startCam();}
   updateBranchBar();closeAdmin();toast('تم الحفظ بنجاح','ok');
 }
 function setConn(ok){document.getElementById('conn').className='conn'+(ok?' ok':'');document.getElementById('connTxt').textContent=ok?'متصل':'غير متصل';}
