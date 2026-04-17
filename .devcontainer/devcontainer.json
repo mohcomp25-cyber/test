@@ -1,0 +1,21 @@
+{
+  "name": "Campaigns Platform (Node 22)",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "منصة الحملات",
+      "onAutoForward": "openPreview",
+      "visibility": "public"
+    }
+  },
+  "postCreateCommand": "cd app && npm run seed",
+  "postAttachCommand": {
+    "server": "cd app && npm start"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["dbaeumer.vscode-eslint"]
+    }
+  }
+}
