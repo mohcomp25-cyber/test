@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>البراندات · DCC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/console/assets/tokens.css">
+<link rel="stylesheet" href="/console/assets/console.css">
+</head>
+<body>
+<div class="app">
+  <div id="top"></div>
+  <div id="content"></div>
+</div>
+<script type="module">
+import { api, ensureAuth, topbar, el, modal, toast } from "/console/assets/console.js";
+
+const acc = await ensureAuth();
+document.getElementById("top").append(...topbar("brands", acc.name));
+const c = document.getElementById("content");
+
+async function render() {
+  c.innerHTML = "";
+  const card = el("div", { class: "card" });
+  card.append(el("div", { class: "section-title" }, "البراندات",
+    el("span", { class: "actions" },
+      el("button", { class: "primary", onclick: addBrand }, "إضافة براند"))));
+
+  const data = await api.get("/api/brands");
+  if (!data.brands.length) {
+    card.append(el("div", { class: "empty" }, "ما في براندات بعد"));
+  } else {
+    const tbl = el("table");
+    tbl.append(el("thead", {}, el("tr", {},
+      el("th", {}, "الاسم"), el("th", {}, "النوع"), el("th", {}, "العملة"),
+      el("th", {}, "الحالة"), el("th", {}, ""))));
+    const tb = el("tbody");
+    for (const b of data.brands) {
+      tb.append(el("tr", {},
+        el("td", {}, b.name),
+        el("td", {}, kindLabel(b.kind)),
+        el("td", {}, b.currency),
+        el("td", {}, b.archived ? el("span", { class: "badge muted" }, "مؤرشف") : el("span", { class: "badge" }, "نشط")),
+        el("td", {},
+          el("button", { class: "tiny ghost", onclick: () => editBrand(b) }, "تعديل"),
+          " ",
+          el("button", { class: "tiny ghost", onclick: () => location.href = `/console/branches.html?brand=${b.id}` }, "الفروع")),
+      ));
+    }
+    tbl.append(tb);
+    card.append(tbl);
+  }
+  c.append(card);
+}
+
+function kindLabel(k) { return k === "cafe" ? "كافيه" : k === "retail" ? "محل" : "مطعم"; }
+
+function addBrand() {
+  const nameI = el("input", { id: "bn", required: true, placeholder: "اسم البراند" });
+  const kindI = el("select", { id: "bk" },
+    el("option", { value: "restaurant" }, "مطعم"),
+    el("option", { value: "cafe" }, "كافيه"),
+    el("option", { value: "retail" }, "محل"));
+  const body = el("div", {},
+    el("div", { class: "field" }, el("label", {}, "الاسم"), nameI),
+    el("div", { class: "field" }, el("label", {}, "النوع"), kindI),
+  );
+  modal("إضافة براند", body, [
+    { label: "إلغاء", class: "ghost", onClick: c => c() },
+    { label: "حفظ", class: "primary", onClick: async (close) => {
+      try {
+        await api.post("/api/brands", { name: nameI.value.trim(), kind: kindI.value });
+        toast("تم"); close(); render();
+      } catch (e) { toast("خطأ في الحفظ", "err"); }
+    } },
+  ]);
+}
+
+function editBrand(b) {
+  const nameI = el("input", { value: b.name });
+  modal("تعديل البراند", el("div", { class: "field" }, el("label", {}, "الاسم"), nameI), [
+    { label: "إلغاء", class: "ghost", onClick: c => c() },
+    { label: "أرشفة", class: "danger", onClick: async (close) => {
+      if (!confirm("تأكيد الأرشفة؟")) return;
+      await api.del(`/api/brands/${b.id}`);
+      toast("أرشف"); close(); render();
+    } },
+    { label: "حفظ", class: "primary", onClick: async (close) => {
+      await api.patch(`/api/brands/${b.id}`, { name: nameI.value.trim() });
+      toast("تم"); close(); render();
+    } },
+  ]);
+}
+
+await render();
+</script>
+</body>
+</html>

@@ -1,0 +1,146 @@
+:root {
+  --org: #00C853;
+  --org2: #69F0AE;
+  --org-dim: rgba(0, 200, 83, .15);
+  --dark: #0A0A0A;
+  --card: #111111;
+  --card2: #161616;
+  --border: #222222;
+  --border2: #2a2a2a;
+  --text: #F0F0F0;
+  --muted: #777777;
+  --muted2: #555555;
+  --red: #ff3d57;
+  --warn: #ffb300;
+  --info: #4fc3f7;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  font-family: 'Tajawal', system-ui, -apple-system, sans-serif;
+  background: var(--dark);
+  color: var(--text);
+  direction: rtl;
+  min-height: 100vh;
+  font-size: 14px;
+}
+
+a { color: var(--org); text-decoration: none; }
+a:hover { color: var(--org2); }
+
+button {
+  font-family: inherit;
+  border: none;
+  cursor: pointer;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-weight: 700;
+  font-size: 13px;
+  background: var(--border);
+  color: var(--text);
+  transition: filter .15s, transform .1s;
+}
+button:hover { filter: brightness(1.15); }
+button:active { transform: scale(.98); }
+button:disabled { opacity: .4; cursor: not-allowed; }
+button.primary { background: linear-gradient(135deg, var(--org), var(--org2)); color: #001b08; }
+button.danger { background: var(--red); color: #fff; }
+button.warn { background: var(--warn); color: #1a1100; }
+button.ghost { background: transparent; border: 1px solid var(--border2); color: var(--text); }
+button.tiny { padding: 6px 10px; font-size: 11px; border-radius: 8px; }
+
+input, select, textarea {
+  font-family: inherit;
+  background: var(--dark);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 13px;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  width: 100%;
+  transition: border-color .15s;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--org); }
+input[type="number"] { font-variant-numeric: tabular-nums; }
+label { font-size: 12px; color: var(--muted); font-weight: 600; display: block; margin-bottom: 6px; letter-spacing: .3px; }
+.field { margin-bottom: 14px; }
+
+.muted { color: var(--muted); }
+.org { color: var(--org); }
+.red { color: var(--red); }
+.warn { color: var(--warn); }
+.right { text-align: right; }
+.center { text-align: center; }
+.tabular { font-variant-numeric: tabular-nums; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+}
+.card + .card { margin-top: 14px; }
+
+.row { display: flex; gap: 10px; align-items: center; }
+.col { display: flex; flex-direction: column; gap: 10px; }
+.spacer { flex: 1; }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+@media (max-width: 640px) {
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  background: var(--org-dim);
+  color: var(--org);
+}
+.badge.warn { background: rgba(255, 179, 0, .18); color: var(--warn); }
+.badge.red { background: rgba(255, 61, 87, .15); color: var(--red); }
+.badge.muted { background: var(--border); color: var(--muted); }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+th {
+  text-align: right;
+  padding: 10px 8px;
+  font-weight: 700;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  letter-spacing: .3px;
+}
+td {
+  padding: 11px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+tr:hover td { background: var(--card2); }
+
+.kpi {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  text-align: center;
+}
+.kpi-n { font-size: 22px; font-weight: 900; color: var(--org); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.kpi-l { font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: .5px; margin-top: 4px; }
+.kpi.red .kpi-n { color: var(--red); }
+.kpi.warn .kpi-n { color: var(--warn); }
+.kpi.muted .kpi-n { color: var(--text); }
+
+.discrepancy-pos { color: var(--org); font-weight: 800; }
+.discrepancy-neg { color: var(--red); font-weight: 800; }
+.discrepancy-zero { color: var(--muted); font-weight: 800; }

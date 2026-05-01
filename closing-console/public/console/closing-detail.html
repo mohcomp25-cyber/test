@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>تفاصيل تقفيل · DCC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/console/assets/tokens.css">
+<link rel="stylesheet" href="/console/assets/console.css">
+</head>
+<body>
+<div class="app">
+  <div id="top"></div>
+  <div id="content"></div>
+</div>
+<script type="module">
+import { api, ensureAuth, topbar, el, modal, toast, fmt, fmtDate, fmtDateTime, statusBadge, discrepancyCell } from "/console/assets/console.js";
+
+const acc = await ensureAuth();
+document.getElementById("top").append(...topbar("closings", acc.name));
+const id = +new URLSearchParams(location.search).get("id");
+if (!id) { document.getElementById("content").innerHTML = "<div class='empty'>لا يوجد ID</div>"; throw new Error("no id"); }
+
+await render();
+
+async function render() {
+  const c = document.getElementById("content");
+  c.innerHTML = "";
+  const data = await api.get(`/api/closings/${id}`);
+  const r = data.closing;
+
+  const head = el("div", { class: "card" });
+  head.append(el("div", { class: "section-title" },
+    `تقفيل #${r.id} — ${r.brand_name} / ${r.branch_name} / ${r.safe_name}`,
+    statusBadge(r.status),
+    el("span", { class: "actions" },
+      r.status === "submitted" && el("button", { class: "primary", onclick: () => confirmIt(r) }, "تأكيد وصول الكاش"),
+      r.status === "submitted" && el("button", { class: "danger", onclick: () => rejectIt(r) }, "رفض"),
+    )));
+  head.append(el("div", { class: "muted", style: "font-size:12px;margin-bottom:10px;" },
+    `قُدِّم: ${fmtDateTime(r.submitted_at)} · بواسطة موظف: ${r.employee_name || "—"} · الموعد التجاري: ${fmtDate(r.business_date)}${r.shift ? " · شفت: " + r.shift : ""}`));
+
+  head.append(el("div", { class: "grid-3" },
+    kpi("إجمالي مبيعات الشفت", fmt(r.total_shift_sales_h)),
+    kpi("شبكة", fmt(r.network_sales_h)),
+    kpi("تطبيقات", fmt(r.apps_sales_h)),
+    kpi("عدد فواتير التطبيقات", String(r.apps_invoice_count || 0)),
+    kpi("كاش متوقع", fmt(r.cash_sales_h), "muted"),
+    kpi("افتتاحية الخزنة", fmt(r.opening_cash_in_safe_h), "muted"),
+    kpi("المتوقع بالخزنة", fmt(r.expected_cash_h), "muted"),
+    kpi("الكاش الفعلي بالخزنة", fmt(r.cash_in_safe_h)),
+    kpiDiff("العجز/الزيادة", r.discrepancy_h),
+    kpi("عهدة بالكاشير", fmt(r.cash_custody_h), "muted"),
+    kpi("مصاريف العهدة", fmt(r.custody_expenses_h)),
+  ));
+
+  if (r.notes) {
+    head.append(el("div", { class: "card2", style: "background:var(--card2);padding:10px;border-radius:10px;margin-top:10px;" },
+      el("div", { class: "muted", style: "font-size:11px;margin-bottom:4px;" }, "ملاحظات الكاشير"),
+      el("div", {}, r.notes)));
+  }
+  if (r.custody_expenses_note) {
+    head.append(el("div", { class: "card2", style: "background:var(--card2);padding:10px;border-radius:10px;margin-top:10px;" },
+      el("div", { class: "muted", style: "font-size:11px;margin-bottom:4px;" }, "ملاحظة مصاريف العهدة"),
+      el("div", {}, r.custody_expenses_note)));
+  }
+  if (r.reject_reason) {
+    head.append(el("div", { class: "card2", style: "background:rgba(255,61,87,.1);padding:10px;border-radius:10px;margin-top:10px;" },
+      el("div", { class: "red", style: "font-size:11px;margin-bottom:4px;" }, "سبب الرفض"),
+      el("div", {}, r.reject_reason)));
+  }
+
+  c.append(head);
+
+  // Attachments
+  const att = el("div", { class: "card" });
+  att.append(el("div", { class: "section-title" }, "المرفقات"));
+  if (!data.attachments.length) {
+    att.append(el("div", { class: "empty" }, "ما في مرفقات"));
+  } else {
+    const grid = el("div", { class: "attachments-grid" });
+    for (const a of data.attachments) {
+      const isImg = (a.content_type || "").startsWith("image/");
+      const card = el("div", { class: "thumb" });
+      if (isImg) {
+        const img = el("img", { src: a.url, loading: "lazy", alt: a.kind });
+        img.addEventListener("click", () => lightbox(a.url));
+        card.append(img);
+      } else {
+        const ph = el("a", { href: a.url, target: "_blank",
+          style: "display:flex;align-items:center;justify-content:center;flex:1;color:var(--org);font-weight:700;" }, "PDF");
+        card.append(ph);
+      }
+      card.append(el("div", { class: "meta" },
+        el("span", {}, kindLabel(a.kind)),
+        el("span", {}, sizeKB(a.size_bytes))));
+      grid.append(card);
+    }
+    att.append(grid);
+  }
+  c.append(att);
+}
+
+function kindLabel(k) {
+  return ({
+    network: "شبكة", apps: "تطبيقات", cash_safe: "كاش بالخزنة",
+    custody: "عهدة", expense_receipt: "إيصال مصروف",
+    deposit_receipt: "إيصال إيداع", other: "أخرى",
+  })[k] || k;
+}
+function sizeKB(b) { return `${Math.round((b || 0) / 1024)}KB`; }
+
+function lightbox(url) {
+  const lb = el("div", { class: "lightbox on", onclick: e => lb.remove() });
+  lb.append(el("img", { src: url }));
+  document.body.append(lb);
+}
+
+function kpi(label, val, cls = "") {
+  return el("div", { class: "kpi " + cls },
+    el("div", { class: "kpi-n" }, val),
+    el("div", { class: "kpi-l" }, label));
+}
+function kpiDiff(label, h) {
+  const n = Number(h);
+  const cls = n > 0 ? "" : n < 0 ? "red" : "muted";
+  return el("div", { class: "kpi " + cls },
+    el("div", { class: "kpi-n" }, fmt(h)),
+    el("div", { class: "kpi-l" }, label));
+}
+
+async function confirmIt(r) {
+  if (!confirm(`تأكيد استلام ${fmt(r.cash_in_safe_h)} ر.س للخزنة؟`)) return;
+  await api.post(`/api/closings/${r.id}/confirm`);
+  toast("تم التأكيد"); render();
+}
+
+async function rejectIt(r) {
+  const reasonI = el("textarea", { rows: 3, placeholder: "اكتب السبب..." });
+  modal("رفض التقفيل", el("div", { class: "field" }, el("label", {}, "السبب"), reasonI), [
+    { label: "إلغاء", class: "ghost", onClick: c => c() },
+    { label: "تأكيد الرفض", class: "danger", onClick: async close => {
+      await api.post(`/api/closings/${r.id}/reject`, { reason: reasonI.value.trim() });
+      toast("رُفض"); close(); render();
+    } },
+  ]);
+}
+</script>
+</body>
+</html>

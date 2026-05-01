@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>الفروع · DCC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/console/assets/tokens.css">
+<link rel="stylesheet" href="/console/assets/console.css">
+</head>
+<body>
+<div class="app">
+  <div id="top"></div>
+  <div id="content"></div>
+</div>
+<script type="module">
+import { api, ensureAuth, topbar, el, modal, toast, fmt, parseAmount } from "/console/assets/console.js";
+
+const acc = await ensureAuth();
+document.getElementById("top").append(...topbar("branches", acc.name));
+const c = document.getElementById("content");
+const params = new URLSearchParams(location.search);
+let activeBrand = +params.get("brand") || null;
+
+async function render() {
+  c.innerHTML = "";
+  const brands = (await api.get("/api/brands")).brands.filter(b => !b.archived);
+  if (!brands.length) {
+    c.append(el("div", { class: "empty card" }, "أنشئ براند أولاً"));
+    return;
+  }
+  if (!activeBrand) activeBrand = brands[0].id;
+
+  const sel = el("select", { onchange: e => { activeBrand = +e.target.value; render(); } },
+    ...brands.map(b => el("option", { value: b.id, selected: b.id === activeBrand }, b.name)));
+
+  c.append(el("div", { class: "card" },
+    el("div", { class: "section-title" }, "البراند", sel,
+      el("span", { class: "actions" },
+        el("button", { class: "primary", onclick: addBranch }, "إضافة فرع"))),
+    el("div", { id: "branches" })));
+
+  const data = await api.get(`/api/brands/${activeBrand}/branches`);
+  const wrap = document.getElementById("branches");
+  if (!data.branches.length) { wrap.append(el("div", { class: "empty" }, "ما في فروع")); return; }
+
+  const tbl = el("table");
+  tbl.append(el("thead", {}, el("tr", {},
+    el("th", {}, "الاسم"), el("th", {}, "الكود"), el("th", {}, "الحالة"), el("th", {}, ""))));
+  const tb = el("tbody");
+  for (const br of data.branches) {
+    tb.append(el("tr", {},
+      el("td", {}, br.name),
+      el("td", {}, br.code || "—"),
+      el("td", {}, br.archived ? el("span", { class: "badge muted" }, "مؤرشف") : el("span", { class: "badge" }, "نشط")),
+      el("td", {},
+        el("button", { class: "tiny ghost", onclick: () => editBranch(br) }, "تعديل"),
+        " ",
+        el("button", { class: "tiny ghost", onclick: () => editSettings(br) }, "إعدادات"),
+        " ",
+        el("button", { class: "tiny ghost", onclick: () => editSafes(br) }, "الخزائن")),
+    ));
+  }
+  tbl.append(tb);
+  wrap.append(tbl);
+}
+
+function addBranch() {
+  const n = el("input", { placeholder: "مثلاً: العليا" });
+  const k = el("input", { placeholder: "اختياري" });
+  modal("إضافة فرع",
+    el("div", {},
+      el("div", { class: "field" }, el("label", {}, "الاسم"), n),
+      el("div", { class: "field" }, el("label", {}, "الكود"), k),
+    ),
+    [
+      { label: "إلغاء", class: "ghost", onClick: c => c() },
+      { label: "حفظ", class: "primary", onClick: async (close) => {
+        await api.post(`/api/brands/${activeBrand}/branches`, { name: n.value.trim(), code: k.value.trim() });
+        toast("تم"); close(); render();
+      } },
+    ]);
+}
+
+function editBranch(br) {
+  const n = el("input", { value: br.name });
+  const k = el("input", { value: br.code || "" });
+  modal("تعديل فرع", el("div", {},
+    el("div", { class: "field" }, el("label", {}, "الاسم"), n),
+    el("div", { class: "field" }, el("label", {}, "الكود"), k),
+  ), [
+    { label: "إلغاء", class: "ghost", onClick: c => c() },
+    { label: "أرشفة", class: "danger", onClick: async close => {
+      if (!confirm("تأكيد؟")) return;
+      await api.del(`/api/branches/${br.id}`); toast("أرشف"); close(); render();
+    } },
+    { label: "حفظ", class: "primary", onClick: async close => {
+      await api.patch(`/api/branches/${br.id}`, { name: n.value.trim(), code: k.value.trim() });
+      toast("تم"); close(); render();
+    } },
+  ]);
+}
+
+async function editSettings(br) {
+  const data = await api.get(`/api/branches/${br.id}/settings`);
+  const s = data.settings;
+  const cb = (k, label) => {
+    const cbox = el("input", { type: "checkbox", id: k, ...(s[k] ? { checked: "checked" } : {}) });
+    return el("div", { class: "toggle-row" }, cbox, el("label", { for: k }, label));
+  };
+  const body = el("div", {},
+    el("div", { class: "muted", style: "margin-bottom:10px;font-size:12px;" }, "حدد المرفقات الإلزامية للكاشير في هذا الفرع:"),
+    cb("require_cash_photo", "صورة الكاش بالخزنة"),
+    cb("require_network_photo", "صورة تقرير الشبكة (إذا كان فيه مبيعات شبكة)"),
+    cb("require_apps_photo", "صورة تقارير التطبيقات (إذا كان فيه مبيعات تطبيقات)"),
+    cb("require_expense_receipt", "صورة إيصال مصاريف العهدة"),
+  );
+  modal(`إعدادات فرع: ${br.name}`, body, [
+    { label: "إلغاء", class: "ghost", onClick: c => c() },
+    { label: "حفظ", class: "primary", onClick: async close => {
+      await api.patch(`/api/branches/${br.id}/settings`, {
+        require_cash_photo: document.getElementById("require_cash_photo").checked,
+        require_network_photo: document.getElementById("require_network_photo").checked,
+        require_apps_photo: document.getElementById("require_apps_photo").checked,
+        require_expense_receipt: document.getElementById("require_expense_receipt").checked,
+      });
+      toast("تم"); close();
+    } },
+  ]);
+}
+
+async function editSafes(br) {
+  const data = await api.get(`/api/branches/${br.id}/safes`);
+  const list = el("div", {});
+  for (const s of data.safes) {
+    list.append(el("div", { style: "display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);" },
+      el("span", {}, `${s.name}${s.archived ? " (مؤرشفة)" : ""}`),
+      el("span", { class: "tabular muted" }, fmt(s.opening_balance_h)),
+    ));
+  }
+  if (!data.safes.length) list.append(el("div", { class: "empty" }, "ما في خزائن"));
+  const nameI = el("input", { placeholder: "خزنة رئيسية" });
+  const openI = el("input", { type: "text", placeholder: "0.00", inputmode: "decimal" });
+  const body = el("div", {},
+    el("div", {}, list),
+    el("div", { style: "margin-top:14px;" }, el("label", {}, "خزنة جديدة")),
+    el("div", { class: "grid-2" },
+      el("div", { class: "field" }, el("label", {}, "الاسم"), nameI),
+      el("div", { class: "field" }, el("label", {}, "الرصيد الافتتاحي (ر.س)"), openI),
+    ),
+  );
+  modal(`خزائن فرع: ${br.name}`, body, [
+    { label: "إلغاء", class: "ghost", onClick: c => c() },
+    { label: "إضافة", class: "primary", onClick: async close => {
+      if (!nameI.value.trim()) return toast("ادخل اسم", "err");
+      let h = 0;
+      try { h = parseAmount(openI.value || "0"); } catch { return toast("رقم غير صحيح", "err"); }
+      await api.post(`/api/branches/${br.id}/safes`, { name: nameI.value.trim(), opening_balance_h: h });
+      toast("تم"); close(); editSafes(br);
+    } },
+  ]);
+}
+
+await render();
+</script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>التقفيلات · DCC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/console/assets/tokens.css">
+<link rel="stylesheet" href="/console/assets/console.css">
+</head>
+<body>
+<div class="app">
+  <div id="top"></div>
+  <div id="content"></div>
+</div>
+<script type="module">
+import { api, ensureAuth, topbar, el, fmt, fmtDate, statusBadge, discrepancyCell, todayBusinessDate } from "/console/assets/console.js";
+
+const acc = await ensureAuth();
+document.getElementById("top").append(...topbar("closings", acc.name));
+const c = document.getElementById("content");
+
+const filter = {
+  brand_id: "", branch_id: "", safe_id: "", employee_id: "", status: "",
+  from: "", to: "",
+  page: 1, page_size: 30,
+};
+
+async function init() {
+  const brands = (await api.get("/api/brands")).brands.filter(b => !b.archived);
+  const card = el("div", { class: "card" });
+  card.append(el("div", { class: "section-title" }, "فلاتر"));
+
+  const brandSel = el("select", { onchange: e => { filter.brand_id = e.target.value; filter.branch_id = ""; reloadBranches(); refresh(); } },
+    el("option", { value: "" }, "كل البراندات"),
+    ...brands.map(b => el("option", { value: b.id }, b.name)));
+  const branchSel = el("select", { onchange: e => { filter.branch_id = e.target.value; refresh(); } },
+    el("option", { value: "" }, "كل الفروع"));
+  const statusSel = el("select", { onchange: e => { filter.status = e.target.value; refresh(); } },
+    el("option", { value: "" }, "كل الحالات"),
+    el("option", { value: "submitted" }, "بانتظار التأكيد"),
+    el("option", { value: "confirmed" }, "مؤكد"),
+    el("option", { value: "rejected" }, "مرفوض"));
+  const fromI = el("input", { type: "date", onchange: e => { filter.from = e.target.value; refresh(); } });
+  const toI = el("input", { type: "date", onchange: e => { filter.to = e.target.value; refresh(); } });
+
+  card.append(el("div", { class: "filter-row" },
+    field("البراند", brandSel),
+    field("الفرع", branchSel),
+    field("الحالة", statusSel),
+    field("من", fromI),
+    field("إلى", toI),
+  ));
+
+  const list = el("div", { id: "list" });
+  const card2 = el("div", { class: "card" }, el("div", { class: "section-title" }, "النتائج"), list);
+  c.append(card, card2);
+
+  async function reloadBranches() {
+    branchSel.innerHTML = "";
+    branchSel.append(el("option", { value: "" }, "كل الفروع"));
+    if (!filter.brand_id) return;
+    const branches = (await api.get(`/api/brands/${filter.brand_id}/branches`)).branches;
+    for (const b of branches) branchSel.append(el("option", { value: b.id }, b.name));
+  }
+
+  async function refresh() {
+    list.innerHTML = "<div class='muted center' style='padding:20px;'>...تحميل</div>";
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(filter)) if (v) qs.set(k, v);
+    const data = await api.get(`/api/closings?${qs}`);
+    list.innerHTML = "";
+    if (!data.closings.length) { list.append(el("div", { class: "empty" }, "لا توجد نتائج")); return; }
+    const tbl = el("table");
+    tbl.append(el("thead", {}, el("tr", {},
+      el("th", {}, "التاريخ"), el("th", {}, "البراند"), el("th", {}, "الفرع"),
+      el("th", {}, "الخزنة"), el("th", {}, "الموظف"),
+      el("th", {}, "إجمالي"), el("th", {}, "كاش متوقع"), el("th", {}, "كاش فعلي"),
+      el("th", {}, "الفرق"), el("th", {}, "الحالة"), el("th", {}, ""))));
+    const tb = el("tbody");
+    for (const r of data.closings) {
+      tb.append(el("tr", {},
+        el("td", {}, fmtDate(r.business_date)),
+        el("td", {}, r.brand_name),
+        el("td", {}, r.branch_name),
+        el("td", {}, r.safe_name),
+        el("td", {}, r.employee_name || "—"),
+        el("td", { class: "tabular" }, fmt(r.total_shift_sales_h)),
+        el("td", { class: "tabular" }, fmt(r.expected_cash_h)),
+        el("td", { class: "tabular" }, fmt(r.cash_in_safe_h)),
+        el("td", { class: "tabular" }, discrepancyCell(r.discrepancy_h)),
+        el("td", {}, statusBadge(r.status)),
+        el("td", {}, el("a", { href: `/console/closing-detail.html?id=${r.id}` }, "فتح")),
+      ));
+    }
+    tbl.append(tb);
+    list.append(tbl);
+    list.append(el("div", { class: "muted center", style: "padding:10px;font-size:11px;" },
+      `${data.closings.length} من ${data.total} (صفحة ${data.page})`));
+  }
+
+  refresh();
+}
+
+function field(label, input) {
+  return el("div", {}, el("label", {}, label), input);
+}
+
+await init();
+</script>
+</body>
+</html>

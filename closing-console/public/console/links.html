@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>روابط الكاشير · DCC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/console/assets/tokens.css">
+<link rel="stylesheet" href="/console/assets/console.css">
+</head>
+<body>
+<div class="app">
+  <div id="top"></div>
+  <div id="content"></div>
+</div>
+<script type="module">
+import { api, ensureAuth, topbar, el, modal, toast, fmtDateTime } from "/console/assets/console.js";
+
+const acc = await ensureAuth();
+document.getElementById("top").append(...topbar("links", acc.name));
+const c = document.getElementById("content");
+let activeBrand = null;
+
+async function render() {
+  c.innerHTML = "";
+  const brands = (await api.get("/api/brands")).brands.filter(b => !b.archived);
+  if (!brands.length) { c.append(el("div", { class: "empty card" }, "أنشئ براند أولاً")); return; }
+  if (!activeBrand) activeBrand = brands[0].id;
+  const sel = el("select", { onchange: e => { activeBrand = +e.target.value; render(); } },
+    ...brands.map(b => el("option", { value: b.id, selected: b.id === activeBrand }, b.name)));
+
+  const card = el("div", { class: "card" },
+    el("div", { class: "section-title" }, "البراند", sel,
+      el("span", { class: "actions" }, el("button", { class: "primary", onclick: createLink }, "توليد رابط جديد"))),
+    el("div", { id: "wrap" }));
+  c.append(card);
+
+  const data = await api.get(`/api/brands/${activeBrand}/links`);
+  const wrap = document.getElementById("wrap");
+  if (!data.links.length) { wrap.append(el("div", { class: "empty" }, "ما في روابط بعد")); return; }
+  const tbl = el("table");
+  tbl.append(el("thead", {}, el("tr", {},
+    el("th", {}, "الفرع"), el("th", {}, "الخزنة"), el("th", {}, "الموظف"),
+    el("th", {}, "الوصف"), el("th", {}, "آخر استخدام"), el("th", {}, "الحالة"), el("th", {}, ""))));
+  const tb = el("tbody");
+  for (const l of data.links) {
+    const status = l.revoked_at ? el("span", { class: "badge red" }, "ملغي")
+      : el("span", { class: "badge" }, "نشط");
+    tb.append(el("tr", {},
+      el("td", {}, l.branch_name),
+      el("td", {}, l.safe_name),
+      el("td", {}, l.employee_name || "أي موظف"),
+      el("td", {}, l.label || "—"),
+      el("td", { class: "muted" }, l.last_used_at ? fmtDateTime(l.last_used_at) : "—"),
+      el("td", {}, status),
+      el("td", {},
+        el("button", { class: "tiny ghost", onclick: () => showLink(l) }, "نسخ الرابط"),
+        " ",
+        !l.revoked_at && el("button", { class: "tiny ghost", onclick: () => regen(l) }, "PIN جديد"),
+        " ",
+        !l.revoked_at && el("button", { class: "tiny danger", onclick: () => revoke(l) }, "إلغاء"))));
+  }
+  tbl.append(tb);
+  wrap.append(tbl);
+}
+
+async function createLink() {
+  const branches = (await api.get(`/api/brands/${activeBrand}/branches`)).branches.filter(b => !b.archived);
+  if (!branches.length) return toast("ما في فروع", "err");
+  const employees = (await api.get(`/api/brands/${activeBrand}/employees`)).employees.filter(e => !e.archived);
+  const branchSel = el("select", {}, ...branches.map(b => el("option", { value: b.id }, b.name)));
+  const safeSel = el("select", {});
+  const empSel = el("select", {}, el("option", { value: "" }, "أي موظف (تقفيل على مستوى الفرع/الخزنة)"),
+    ...employees.map(e => el("option", { value: e.id }, e.name)));
+  const labelI = el("input", { placeholder: "اختياري" });
+
+  async function reloadSafes() {
+    const bid = +branchSel.value;
+    safeSel.innerHTML = "";
+    const safes = (await api.get(`/api/branches/${bid}/safes`)).safes.filter(s => !s.archived);
+    for (const s of safes) safeSel.append(el("option", { value: s.id }, s.name));
+  }
+  branchSel.addEventListener("change", reloadSafes);
+  await reloadSafes();
+
+  modal("توليد رابط كاشير", el("div", {},
+    el("div", { class: "field" }, el("label", {}, "الفرع"), branchSel),
+    el("div", { class: "field" }, el("label", {}, "الخزنة"), safeSel),
+    el("div", { class: "field" }, el("label", {}, "الموظف (اختياري)"), empSel),
+    el("div", { class: "field" }, el("label", {}, "وصف"), labelI),
+    el("div", { class: "muted", style: "font-size:11px;" }, "الـ PIN يظهر مرة واحدة بعد الإنشاء — لازم تنسخه فوراً."),
+  ), [
+    { label: "إلغاء", class: "ghost", onClick: c => c() },
+    { label: "توليد", class: "primary", onClick: async close => {
+      if (!safeSel.value) return toast("اختر خزنة", "err");
+      const r = await api.post(`/api/brands/${activeBrand}/links`, {
+        branch_id: +branchSel.value, safe_id: +safeSel.value,
+        employee_id: empSel.value ? +empSel.value : null,
+        label: labelI.value.trim() || null,
+      });
+      close(); displaySecret(r.token, r.pin);
+      render();
+    } },
+  ]);
+}
+
+function displaySecret(token, pin) {
+  const url = `${location.origin}/cashier/index.html?t=${token}`;
+  const lineUrl = el("div", { class: "copy-input" },
+    el("span", {}, url),
+    el("button", { class: "tiny", onclick: e => { navigator.clipboard.writeText(url); toast("تم النسخ"); } }, "نسخ"));
+  const linePin = el("div", { class: "copy-input" },
+    el("span", {}, pin),
+    el("button", { class: "tiny", onclick: e => { navigator.clipboard.writeText(pin); toast("تم النسخ"); } }, "نسخ"));
+  modal("الرابط والـ PIN", el("div", {},
+    el("div", { class: "warn", style: "background:rgba(255,179,0,.12);border:1px solid var(--warn);border-radius:10px;padding:10px;margin-bottom:14px;font-size:12px;font-weight:700;" }, "هذه آخر مرة بتشوف فيها الـ PIN. خذ نسخة الآن وأرسلها للكاشير."),
+    el("label", {}, "الرابط"), lineUrl,
+    el("label", {}, "الـ PIN"), linePin,
+  ));
+}
+
+async function regen(l) {
+  if (!confirm("توليد PIN جديد سيلغي الـ PIN القديم. تأكيد؟")) return;
+  const r = await api.post(`/api/links/${l.id}/regenerate-pin`);
+  modal("PIN جديد", el("div", {},
+    el("div", { class: "warn", style: "background:rgba(255,179,0,.12);border:1px solid var(--warn);border-radius:10px;padding:10px;margin-bottom:14px;font-size:12px;font-weight:700;" }, "خذ نسخة الآن. لن يظهر مرة أخرى."),
+    el("div", { class: "copy-input" }, el("span", {}, r.pin),
+      el("button", { class: "tiny", onclick: () => { navigator.clipboard.writeText(r.pin); toast("تم النسخ"); } }, "نسخ"))));
+  render();
+}
+
+async function revoke(l) {
+  if (!confirm("إلغاء هذا الرابط نهائياً؟")) return;
+  await api.post(`/api/links/${l.id}/revoke`);
+  toast("ألغي"); render();
+}
+
+function showLink(l) {
+  const url = `${location.origin}/cashier/index.html?t=${l.token}`;
+  modal("الرابط", el("div", { class: "copy-input" },
+    el("span", {}, url),
+    el("button", { class: "tiny", onclick: () => { navigator.clipboard.writeText(url); toast("تم النسخ"); } }, "نسخ")));
+}
+
+await render();
+</script>
+</body>
+</html>

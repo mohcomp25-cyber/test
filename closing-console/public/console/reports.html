@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>التقارير · DCC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/console/assets/tokens.css">
+<link rel="stylesheet" href="/console/assets/console.css">
+</head>
+<body>
+<div class="app">
+  <div id="top"></div>
+  <div id="content"></div>
+</div>
+<script type="module">
+import { api, ensureAuth, topbar, el, fmt, fmtDate, todayBusinessDate, statusBadge, discrepancyCell } from "/console/assets/console.js";
+
+const acc = await ensureAuth();
+document.getElementById("top").append(...topbar("reports", acc.name));
+const c = document.getElementById("content");
+
+const today = todayBusinessDate();
+const state = { brand: "", from: today, to: today };
+
+async function init() {
+  c.innerHTML = "";
+  const brands = (await api.get("/api/brands")).brands.filter(b => !b.archived);
+  const brandSel = el("select", { onchange: e => { state.brand = e.target.value; refresh(); } },
+    el("option", { value: "" }, "كل البراندات"),
+    ...brands.map(b => el("option", { value: b.id, selected: String(b.id) === state.brand }, b.name)));
+  const fromI = el("input", { type: "date", value: state.from, onchange: e => { state.from = e.target.value; refresh(); } });
+  const toI = el("input", { type: "date", value: state.to, onchange: e => { state.to = e.target.value; refresh(); } });
+  const csvBtn = el("button", { class: "primary", onclick: downloadCsv }, "تحميل CSV");
+
+  c.append(el("div", { class: "card" },
+    el("div", { class: "section-title" }, "تقرير المدى",
+      el("span", { class: "actions" }, csvBtn)),
+    el("div", { class: "filter-row" },
+      field("البراند", brandSel),
+      field("من", fromI),
+      field("إلى", toI),
+    )));
+
+  await refresh();
+}
+
+async function refresh() {
+  const old = document.getElementById("body");
+  if (old) old.remove();
+  const wrap = el("div", { id: "body" });
+  c.append(wrap);
+  const qs = new URLSearchParams({ from: state.from, to: state.to });
+  if (state.brand) qs.set("brand_id", state.brand);
+  const data = await api.get(`/api/reports/range?${qs}`);
+  const t = data.totals;
+  wrap.append(el("div", { class: "grid-3" },
+    kpi("إجمالي مبيعات", fmt(t.total_shift_sales_h)),
+    kpi("شبكة", fmt(t.network_sales_h), "muted"),
+    kpi("تطبيقات", fmt(t.apps_sales_h), "muted"),
+    kpi("كاش متوقع", fmt(t.cash_sales_h)),
+    kpi("كاش فعلي", fmt(t.cash_in_safe_h)),
+    kpiD("صافي الفروقات", t.discrepancy_h),
+  ));
+
+  const card = el("div", { class: "card" });
+  card.append(el("div", { class: "section-title" }, "التفاصيل"));
+  if (!data.rows.length) { card.append(el("div", { class: "empty" }, "لا توجد بيانات")); }
+  else {
+    const tbl = el("table");
+    tbl.append(el("thead", {}, el("tr", {},
+      el("th", {}, "التاريخ"), el("th", {}, "البراند"), el("th", {}, "الفرع"),
+      el("th", {}, "الخزنة"), el("th", {}, "إجمالي"), el("th", {}, "كاش متوقع"),
+      el("th", {}, "كاش فعلي"), el("th", {}, "الفرق"), el("th", {}, "الحالة"))));
+    const tb = el("tbody");
+    for (const r of data.rows) {
+      tb.append(el("tr", {},
+        el("td", {}, fmtDate(r.business_date)),
+        el("td", {}, r.brand_name),
+        el("td", {}, r.branch_name),
+        el("td", {}, r.safe_name),
+        el("td", { class: "tabular" }, fmt(r.total_shift_sales_h)),
+        el("td", { class: "tabular" }, fmt(r.expected_cash_h)),
+        el("td", { class: "tabular" }, fmt(r.cash_in_safe_h)),
+        el("td", { class: "tabular" }, discrepancyCell(r.discrepancy_h)),
+        el("td", {}, statusBadge(r.status))));
+    }
+    tbl.append(tb);
+    card.append(tbl);
+  }
+  wrap.append(card);
+}
+
+function downloadCsv() {
+  const qs = new URLSearchParams({ from: state.from, to: state.to, format: "csv" });
+  if (state.brand) qs.set("brand_id", state.brand);
+  location.href = `/api/reports/range?${qs}`;
+}
+
+function kpi(label, val, cls = "") {
+  return el("div", { class: "kpi " + cls },
+    el("div", { class: "kpi-n" }, val),
+    el("div", { class: "kpi-l" }, label));
+}
+function kpiD(label, h) {
+  const n = Number(h);
+  const cls = n > 0 ? "" : n < 0 ? "red" : "muted";
+  return kpi(label, fmt(h), cls);
+}
+function field(label, input) { return el("div", {}, el("label", {}, label), input); }
+
+await init();
+</script>
+</body>
+</html>

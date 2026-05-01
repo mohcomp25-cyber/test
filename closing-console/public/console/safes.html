@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>جرد الخزنة · DCC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/console/assets/tokens.css">
+<link rel="stylesheet" href="/console/assets/console.css">
+</head>
+<body>
+<div class="app">
+  <div id="top"></div>
+  <div id="content"></div>
+</div>
+<script type="module">
+import { api, ensureAuth, topbar, el, fmt, fmtDate, todayBusinessDate } from "/console/assets/console.js";
+
+const acc = await ensureAuth();
+document.getElementById("top").append(...topbar("safes", acc.name));
+const c = document.getElementById("content");
+const state = { brand: "", branch: "", safe: "", period: "day", anchor: todayBusinessDate() };
+
+async function init() {
+  c.innerHTML = "";
+  const brands = (await api.get("/api/brands")).brands.filter(b => !b.archived);
+  if (!brands.length) { c.append(el("div", { class: "empty card" }, "أنشئ براند أولاً")); return; }
+  if (!state.brand) state.brand = brands[0].id;
+
+  const brandSel = el("select", { onchange: e => { state.brand = +e.target.value; state.branch = ""; state.safe = ""; init(); } },
+    ...brands.map(b => el("option", { value: b.id, selected: b.id === state.brand }, b.name)));
+  const branches = (await api.get(`/api/brands/${state.brand}/branches`)).branches.filter(b => !b.archived);
+  if (!state.branch && branches.length) state.branch = branches[0].id;
+  const branchSel = el("select", { onchange: e => { state.branch = +e.target.value; state.safe = ""; init(); } },
+    ...branches.map(b => el("option", { value: b.id, selected: b.id === state.branch }, b.name)));
+  const safes = state.branch ? (await api.get(`/api/branches/${state.branch}/safes`)).safes.filter(s => !s.archived) : [];
+  if (!state.safe && safes.length) state.safe = safes[0].id;
+  const safeSel = el("select", { onchange: e => { state.safe = +e.target.value; init(); } },
+    ...safes.map(s => el("option", { value: s.id, selected: s.id === state.safe }, s.name)));
+
+  const periodTabs = el("div", { class: "period-tabs" });
+  for (const [k, label] of [["day", "يومي"], ["week", "أسبوعي"], ["month", "شهري"]]) {
+    periodTabs.append(el("button", { class: state.period === k ? "active" : "", onclick: () => { state.period = k; init(); } }, label));
+  }
+  const anchorI = el("input", { type: "date", value: state.anchor, onchange: e => { state.anchor = e.target.value; init(); } });
+
+  c.append(el("div", { class: "card" },
+    el("div", { class: "section-title" }, "تصفية",
+      el("span", { class: "actions" }, periodTabs)),
+    el("div", { class: "filter-row" },
+      field("البراند", brandSel),
+      field("الفرع", branchSel),
+      field("الخزنة", safeSel),
+      field("التاريخ المرجعي", anchorI),
+    )));
+
+  if (!state.safe) { c.append(el("div", { class: "empty card" }, "اختر خزنة")); return; }
+
+  const balance = await api.get(`/api/safes/${state.safe}/balance?at=${state.anchor}`);
+  c.append(el("div", { class: "grid-3" },
+    kpi("رصيد الخزنة الآن", fmt(balance.balance_h)),
+    kpi("الرصيد الافتتاحي", fmt(balance.safe.opening_balance_h || 0), "muted"),
+    kpi("التاريخ المرجعي", balance.at, "muted"),
+  ));
+
+  const ledger = await api.get(`/api/safes/${state.safe}/ledger?period=${state.period}&anchor=${state.anchor}`);
+  const ledCard = el("div", { class: "card" });
+  ledCard.append(el("div", { class: "section-title" }, `سجل الحركات: ${ledger.from} → ${ledger.to}`));
+  ledCard.append(el("div", { class: "grid-3" },
+    kpi("افتتاحية الفترة", fmt(ledger.opening_h)),
+    kpi("ختامية الفترة", fmt(ledger.closing_h)),
+    kpi("صافي الفترة", fmt(ledger.closing_h - ledger.opening_h), ledger.closing_h - ledger.opening_h < 0 ? "red" : ""),
+  ));
+  if (!ledger.movements.length) {
+    ledCard.append(el("div", { class: "empty" }, "لا توجد حركات في هذه الفترة"));
+  } else {
+    const tbl = el("table", { style: "margin-top:14px;" });
+    tbl.append(el("thead", {}, el("tr", {},
+      el("th", {}, "التاريخ"), el("th", {}, "النوع"), el("th", {}, "المبلغ"),
+      el("th", {}, "الرصيد"), el("th", {}, "ملاحظة"))));
+    const tb = el("tbody");
+    for (const m of ledger.movements) {
+      const sign = m.amount_h >= 0 ? "+" : "−";
+      tb.append(el("tr", {},
+        el("td", {}, fmtDate(m.business_date)),
+        el("td", {}, kindLabel(m.kind)),
+        el("td", { class: "tabular " + (m.amount_h < 0 ? "red" : "org") }, `${sign} ${fmt(Math.abs(m.amount_h))}`),
+        el("td", { class: "tabular" }, fmt(m.running_h)),
+        el("td", { class: "muted", style: "font-size:11px;" }, m.note || "—")));
+    }
+    tbl.append(tb);
+    ledCard.append(tbl);
+  }
+  c.append(ledCard);
+}
+
+function kpi(label, val, cls = "") {
+  return el("div", { class: "kpi " + cls },
+    el("div", { class: "kpi-n" }, val),
+    el("div", { class: "kpi-l" }, label));
+}
+function field(label, input) {
+  return el("div", {}, el("label", {}, label), input);
+}
+function kindLabel(k) {
+  return ({
+    opening: "افتتاحية", closing_confirmed: "تقفيل مؤكد", deposit: "إيداع بنكي", adjustment: "تسوية",
+  })[k] || k;
+}
+
+await init();
+</script>
+</body>
+</html>

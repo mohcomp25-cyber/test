@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>الرئيسية · DCC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/console/assets/tokens.css">
+<link rel="stylesheet" href="/console/assets/console.css">
+</head>
+<body>
+<div class="app">
+  <div id="top"></div>
+  <div id="content">
+    <div class="muted" style="padding:30px;text-align:center;">…تحميل</div>
+  </div>
+</div>
+
+<script type="module">
+import { api, ensureAuth, topbar, el, fmtSAR, fmt, todayBusinessDate, statusBadge, fmtDate, discrepancyCell } from "/console/assets/console.js";
+
+const acc = await ensureAuth();
+if (!acc) throw new Error("nope");
+document.getElementById("top").append(...topbar("dashboard", acc.name));
+
+const today = todayBusinessDate();
+const c = document.getElementById("content");
+c.innerHTML = "";
+
+const kpis = el("div", { class: "grid-3", id: "kpis" });
+c.append(kpis);
+
+const recent = el("div", { class: "card", id: "recent" });
+recent.append(el("div", { class: "section-title" }, `تقفيلات اليوم (${today})`));
+c.append(recent);
+
+const brands = await api.get("/api/brands");
+const todayRep = await api.get(`/api/reports/eod?date=${today}`);
+const t = todayRep.totals;
+
+kpis.append(
+  kpi("مبيعات اليوم", fmtSAR(t.total_shift_sales_h)),
+  kpi("مبيعات كاش متوقعة", fmtSAR(t.cash_sales_h)),
+  kpiD("الفروقات اليوم", t.discrepancy_h),
+  kpi("شبكة", fmtSAR(t.network_sales_h), "muted"),
+  kpi("تطبيقات", fmtSAR(t.apps_sales_h), "muted"),
+  kpi("عدد فواتير التطبيقات", String(t.apps_invoice_count || 0), "muted"),
+);
+
+if (todayRep.rows.length === 0) {
+  recent.append(el("div", { class: "empty" }, "ما في تقفيلات اليوم بعد"));
+} else {
+  const tbl = el("table");
+  tbl.append(el("thead", {}, el("tr", {},
+    el("th", {}, "البراند"), el("th", {}, "الفرع"), el("th", {}, "الخزنة"), el("th", {}, "الموظف"),
+    el("th", {}, "إجمالي"), el("th", {}, "كاش متوقع"), el("th", {}, "كاش بالخزنة"),
+    el("th", {}, "العجز/الزيادة"), el("th", {}, "الحالة"), el("th", {}, ""),
+  )));
+  const tb = el("tbody");
+  for (const r of todayRep.rows) {
+    const a = el("a", { href: `/console/closing-detail.html?id=${r.id}` }, "فتح");
+    tb.append(el("tr", {},
+      el("td", {}, r.brand_name),
+      el("td", {}, r.branch_name),
+      el("td", {}, r.safe_name),
+      el("td", {}, r.employee_name || "—"),
+      el("td", { class: "tabular" }, fmt(r.total_shift_sales_h)),
+      el("td", { class: "tabular" }, fmt(r.expected_cash_h)),
+      el("td", { class: "tabular" }, fmt(r.cash_in_safe_h)),
+      el("td", { class: "tabular" }, discrepancyCell(r.discrepancy_h)),
+      el("td", {}, statusBadge(r.status)),
+      el("td", {}, a),
+    ));
+  }
+  tbl.append(tb);
+  recent.append(tbl);
+}
+
+if (!brands.brands.length) {
+  c.append(el("div", { class: "card empty" },
+    "ابدأ بإنشاء براند ثم فرع ثم خزنة. ",
+    el("a", { href: "/console/brands.html" }, "إضافة براند →"),
+  ));
+}
+
+function kpi(label, val, cls = "") {
+  return el("div", { class: "kpi " + cls },
+    el("div", { class: "kpi-n" }, val),
+    el("div", { class: "kpi-l" }, label));
+}
+function kpiD(label, h) {
+  const n = Number(h);
+  const cls = n > 0 ? "" : n < 0 ? "red" : "muted";
+  return kpi(label, fmt(h), cls);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>إيداعات البنك · DCC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/console/assets/tokens.css">
+<link rel="stylesheet" href="/console/assets/console.css">
+</head>
+<body>
+<div class="app">
+  <div id="top"></div>
+  <div id="content"></div>
+</div>
+<script type="module">
+import { api, ensureAuth, topbar, el, modal, toast, fmt, fmtDate, parseAmount, todayBusinessDate, uploadOne } from "/console/assets/console.js";
+
+const acc = await ensureAuth();
+document.getElementById("top").append(...topbar("deposits", acc.name));
+const c = document.getElementById("content");
+const state = { brand: "", branch: "", safe: "" };
+
+async function init() {
+  c.innerHTML = "";
+  const brands = (await api.get("/api/brands")).brands.filter(b => !b.archived);
+  if (!brands.length) { c.append(el("div", { class: "empty card" }, "أنشئ براند أولاً")); return; }
+  if (!state.brand) state.brand = brands[0].id;
+  const brandSel = el("select", { onchange: e => { state.brand = +e.target.value; state.branch = ""; state.safe = ""; init(); } },
+    ...brands.map(b => el("option", { value: b.id, selected: b.id === state.brand }, b.name)));
+
+  const branches = (await api.get(`/api/brands/${state.brand}/branches`)).branches.filter(b => !b.archived);
+  if (!state.branch && branches.length) state.branch = branches[0].id;
+  const branchSel = el("select", { onchange: e => { state.branch = +e.target.value; state.safe = ""; init(); } },
+    ...branches.map(b => el("option", { value: b.id, selected: b.id === state.branch }, b.name)));
+
+  const safes = state.branch ? (await api.get(`/api/branches/${state.branch}/safes`)).safes.filter(s => !s.archived) : [];
+  if (!state.safe && safes.length) state.safe = safes[0].id;
+  const safeSel = el("select", { onchange: e => { state.safe = +e.target.value; init(); } },
+    ...safes.map(s => el("option", { value: s.id, selected: s.id === state.safe }, s.name)));
+
+  c.append(el("div", { class: "card" },
+    el("div", { class: "section-title" }, "إيداعات البنك",
+      el("span", { class: "actions" }, el("button", { class: "primary", onclick: addDeposit, disabled: !state.safe }, "إيداع جديد"))),
+    el("div", { class: "filter-row" },
+      field("البراند", brandSel),
+      field("الفرع", branchSel),
+      field("الخزنة", safeSel),
+    )));
+
+  if (!state.safe) { c.append(el("div", { class: "empty card" }, "اختر خزنة")); return; }
+  const data = await api.get(`/api/safes/${state.safe}/deposits`);
+  const card = el("div", { class: "card" });
+  if (!data.deposits.length) { card.append(el("div", { class: "empty" }, "لا توجد إيداعات")); }
+  else {
+    const tbl = el("table");
+    tbl.append(el("thead", {}, el("tr", {},
+      el("th", {}, "التاريخ"), el("th", {}, "المبلغ"), el("th", {}, "البنك"),
+      el("th", {}, "المرجع"), el("th", {}, "ملاحظات"), el("th", {}, "إيصالات"), el("th", {}, ""))));
+    const tb = el("tbody");
+    for (const d of data.deposits) {
+      tb.append(el("tr", {},
+        el("td", {}, fmtDate(d.business_date)),
+        el("td", { class: "tabular org" }, fmt(d.amount_h)),
+        el("td", {}, d.bank_name || "—"),
+        el("td", {}, d.reference || "—"),
+        el("td", { class: "muted", style: "font-size:11px;" }, d.notes || "—"),
+        el("td", {}, d.attachments_count ? el("button", { class: "tiny ghost", onclick: () => showReceipts(d.id) }, `(${d.attachments_count})`) : "—"),
+        el("td", {}, el("button", { class: "tiny danger", onclick: async () => {
+          if (!confirm("حذف الإيداع؟")) return;
+          await api.del(`/api/deposits/${d.id}`); toast("تم الحذف"); init();
+        } }, "حذف"))));
+    }
+    tbl.append(tb);
+    card.append(tbl);
+  }
+  c.append(card);
+}
+
+function field(label, input) { return el("div", {}, el("label", {}, label), input); }
+
+function addDeposit() {
+  const amt = el("input", { type: "text", inputmode: "decimal", placeholder: "0.00" });
+  const date = el("input", { type: "date", value: todayBusinessDate() });
+  const bank = el("input", { placeholder: "اسم البنك" });
+  const refI = el("input", { placeholder: "رقم المرجع" });
+  const notes = el("input", { placeholder: "ملاحظات" });
+  const file = el("input", { type: "file", accept: "image/*,application/pdf" });
+
+  modal("إيداع جديد", el("div", {},
+    el("div", { class: "field" }, el("label", {}, "المبلغ (ر.س)"), amt),
+    el("div", { class: "field" }, el("label", {}, "التاريخ"), date),
+    el("div", { class: "field" }, el("label", {}, "البنك"), bank),
+    el("div", { class: "field" }, el("label", {}, "المرجع"), refI),
+    el("div", { class: "field" }, el("label", {}, "ملاحظات"), notes),
+    el("div", { class: "field" }, el("label", {}, "إيصال البنك"), file),
+  ), [
+    { label: "إلغاء", class: "ghost", onClick: c => c() },
+    { label: "حفظ", class: "primary", onClick: async close => {
+      let h = 0;
+      try { h = parseAmount(amt.value); } catch { return toast("مبلغ غير صحيح", "err"); }
+      if (h <= 0) return toast("مبلغ غير صحيح", "err");
+      const attachments = [];
+      const f = file.files?.[0];
+      if (f) {
+        try {
+          const sign = await api.post("/api/uploads/sign", { content_type: f.type, size_bytes: f.size, kind: "deposit_receipt" });
+          attachments.push(await uploadOne(f, sign));
+        } catch (e) { return toast("فشل رفع الإيصال", "err"); }
+      }
+      await api.post(`/api/safes/${state.safe}/deposits`, {
+        amount_h: h, business_date: date.value || todayBusinessDate(),
+        bank_name: bank.value.trim() || null, reference: refI.value.trim() || null,
+        notes: notes.value.trim() || null, attachment_keys: attachments,
+      });
+      toast("تم"); close(); init();
+    } },
+  ]);
+}
+
+async function showReceipts(depId) {
+  const data = await api.get(`/api/deposits/${depId}/attachments`);
+  const grid = el("div", { class: "attachments-grid" });
+  for (const a of data.attachments) {
+    if ((a.content_type || "").startsWith("image/")) {
+      const img = el("img", { src: a.url, style: "width:100%;height:200px;object-fit:contain;background:var(--dark);border-radius:8px;cursor:zoom-in;" });
+      img.addEventListener("click", () => {
+        const lb = el("div", { class: "lightbox on", onclick: e => lb.remove() });
+        lb.append(el("img", { src: a.url }));
+        document.body.append(lb);
+      });
+      grid.append(img);
+    } else {
+      grid.append(el("a", { href: a.url, target: "_blank", style: "color:var(--org);font-weight:700;padding:14px;" }, "PDF"));
+    }
+  }
+  modal("إيصالات الإيداع", grid);
+}
+
+await init();
+</script>
+</body>
+</html>
