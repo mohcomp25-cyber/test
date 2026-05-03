@@ -1,0 +1,2724 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0f766e" />
+  <title>منصة الموارد البشرية</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <style>
+:root {
+  --bg: #f5f7fa;
+  --surface: #ffffff;
+  --surface-2: #f0fdfa;
+  --border: #e5e7eb;
+  --text: #0f172a;
+  --muted: #64748b;
+  --primary: #0f766e;
+  --primary-600: #0d6660;
+  --primary-50: #ccfbf1;
+  --danger: #dc2626;
+  --warning: #d97706;
+  --info: #0284c7;
+  --success: #16a34a;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --sidebar-w: 260px;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: 'Tajawal', system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ==== App shell ==== */
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+}
+.app-shell[data-state="auth"] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0f766e 0%, #134e4a 100%);
+  padding: 24px;
+}
+.app-shell[data-state="public"] {
+  display: block;
+  background: var(--bg);
+}
+
+.sidebar {
+  background: var(--surface);
+  border-inline-start: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 14px;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+.brand { display: flex; gap: 10px; align-items: center; padding: 6px 4px 14px; border-bottom: 1px solid var(--border); }
+.brand-mark {
+  width: 42px; height: 42px; border-radius: 10px;
+  background: var(--primary); color: #fff;
+  display: grid; place-items: center; font-weight: 800;
+}
+.brand-title { font-weight: 800; font-size: 14px; }
+.brand-sub { color: var(--muted); font-size: 12px; }
+.nav { display: flex; flex-direction: column; gap: 4px; }
+.nav a {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: var(--radius-sm);
+  color: var(--text); font-weight: 500;
+}
+.nav a:hover { background: var(--surface-2); text-decoration: none; }
+.nav a.active { background: var(--primary-50); color: var(--primary-600); }
+.nav a span { width: 22px; text-align: center; }
+.sidebar-footer { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); }
+
+.main { min-width: 0; display: flex; flex-direction: column; }
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  display: flex; align-items: center; gap: 16px;
+  position: sticky; top: 0; z-index: 5;
+}
+.topbar-title { font-weight: 700; font-size: 18px; flex: 1; }
+.btn-icon {
+  background: transparent; border: 0; font-size: 22px; cursor: pointer;
+  display: none; color: var(--text);
+}
+.user-chip {
+  background: var(--surface-2); color: var(--primary-600);
+  border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600;
+}
+.view { padding: 24px; flex: 1; min-height: 0; }
+
+/* ==== Buttons ==== */
+.btn, .btn-ghost, .btn-danger, .btn-secondary {
+  font-family: inherit; font-size: 14px; font-weight: 600;
+  padding: 9px 16px; border-radius: var(--radius-sm);
+  cursor: pointer; border: 1px solid transparent;
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: all .15s ease;
+}
+.btn { background: var(--primary); color: #fff; }
+.btn:hover { background: var(--primary-600); }
+.btn:disabled { background: #94a3b8; cursor: not-allowed; }
+.btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
+.btn-secondary:hover { background: var(--surface-2); }
+.btn-ghost { background: transparent; color: var(--muted); border-color: var(--border); }
+.btn-ghost:hover { background: var(--surface-2); color: var(--text); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { filter: brightness(.92); }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ==== Cards / sections ==== */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+.section-head {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 12px; margin-bottom: 16px; flex-wrap: wrap;
+}
+.section-head h2 { margin: 0; font-size: 20px; }
+
+/* ==== Tables ==== */
+.table-wrap { overflow-x: auto; }
+table.data {
+  width: 100%; border-collapse: collapse; background: var(--surface);
+  border-radius: var(--radius); overflow: hidden;
+  border: 1px solid var(--border);
+  font-size: 14px;
+}
+table.data th, table.data td { padding: 12px 14px; text-align: start; }
+table.data thead th {
+  background: var(--surface-2); font-weight: 700; color: var(--text);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+table.data tbody tr { border-top: 1px solid var(--border); }
+table.data tbody tr:hover { background: #fafafa; }
+.empty {
+  padding: 40px; text-align: center; color: var(--muted);
+  background: var(--surface); border-radius: var(--radius);
+  border: 1px dashed var(--border);
+}
+
+/* ==== Pills / badges ==== */
+.pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 600;
+  background: var(--surface-2); color: var(--primary-600);
+}
+.pill-danger { background: #fee2e2; color: #b91c1c; }
+.pill-warning { background: #ffedd5; color: #c2410c; }
+.pill-info { background: #dbeafe; color: #1d4ed8; }
+.pill-success { background: #dcfce7; color: #15803d; }
+.pill-muted { background: #e2e8f0; color: #475569; }
+
+/* ==== Modal / dialog ==== */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(15,23,42,.5);
+  display: grid; place-items: center; z-index: 50; padding: 20px;
+}
+.modal {
+  background: var(--surface); border-radius: var(--radius);
+  padding: 24px; max-width: 560px; width: 100%;
+  max-height: 90vh; overflow-y: auto;
+}
+.modal h3 { margin-top: 0; }
+
+/* ==== Toast ==== */
+.toast-host {
+  position: fixed; bottom: 24px; inset-inline-end: 24px;
+  display: flex; flex-direction: column; gap: 8px; z-index: 100;
+}
+.toast {
+  background: var(--text); color: #fff; padding: 10px 14px;
+  border-radius: var(--radius-sm); box-shadow: var(--shadow);
+  animation: slidein .2s ease;
+  font-size: 14px;
+}
+.toast.success { background: var(--success); }
+.toast.error { background: var(--danger); }
+@keyframes slidein {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ==== Auth screen ==== */
+.auth-card {
+  background: var(--surface); border-radius: var(--radius);
+  padding: 32px; max-width: 440px; width: 100%;
+  box-shadow: var(--shadow);
+}
+.auth-card h1 { margin-top: 0; font-size: 22px; }
+.auth-card p { color: var(--muted); margin-top: 4px; }
+.auth-switch { text-align: center; margin-top: 14px; font-size: 13px; color: var(--muted); }
+
+/* ==== Public form pages ==== */
+.public-page {
+  max-width: 560px; margin: 24px auto; padding: 0 16px;
+}
+.public-page .card { padding: 28px; }
+.public-page h1 { margin-top: 0; font-size: 22px; }
+
+/* ==== Responsive ==== */
+@media (max-width: 880px) {
+  .app-shell { grid-template-columns: 1fr; }
+  .sidebar {
+    position: fixed; inset-inline-start: 0; top: 0;
+    width: 80%; max-width: 300px; z-index: 20;
+    transform: translateX(100%);
+    transition: transform .25s ease;
+    box-shadow: 0 0 30px rgba(0,0,0,.15);
+  }
+  html[dir="rtl"] .sidebar { transform: translateX(100%); }
+  .app-shell.menu-open .sidebar { transform: translateX(0); }
+  .btn-icon { display: inline-flex; }
+  .view { padding: 16px; }
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.kpi {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px;
+  display: flex; align-items: center; gap: 12px;
+  box-shadow: var(--shadow-sm);
+}
+.kpi-icon {
+  width: 44px; height: 44px; border-radius: 10px;
+  display: grid; place-items: center;
+  background: var(--surface-2); color: var(--primary-600);
+  font-size: 22px;
+}
+.kpi-value { font-size: 22px; font-weight: 800; }
+.kpi-label { color: var(--muted); font-size: 13px; }
+
+.alert-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.alert-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+  display: flex; flex-direction: column;
+  box-shadow: var(--shadow-sm);
+}
+.alert-card-head {
+  padding: 14px 16px;
+  display: flex; justify-content: space-between; align-items: center;
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
+}
+.alert-card-head .count { font-size: 22px; }
+.alert-card.expired .alert-card-head { background: #fee2e2; color: #b91c1c; }
+.alert-card.urgent  .alert-card-head { background: #ffedd5; color: #c2410c; }
+.alert-card.soon    .alert-card-head { background: #fef3c7; color: #92400e; }
+.alert-card.ok      .alert-card-head { background: #dcfce7; color: #15803d; }
+
+.alert-list { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto; }
+.alert-list li {
+  padding: 10px 16px; border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; font-size: 13px;
+}
+.alert-list li:last-child { border-bottom: 0; }
+.alert-list .item-meta { color: var(--muted); font-size: 12px; }
+.alert-card-foot {
+  padding: 10px 16px; border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; gap: 8px;
+}
+
+.dash-row {
+  display: grid; grid-template-columns: 2fr 1fr;
+  gap: 16px; margin-top: 22px;
+}
+@media (max-width: 900px) {
+  .dash-row { grid-template-columns: 1fr; }
+}
+
+.activity-list { list-style: none; margin: 0; padding: 0; max-height: 360px; overflow-y: auto; }
+.activity-list li {
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.activity-list li:last-child { border-bottom: 0; }
+.activity-list .ts { color: var(--muted); font-size: 11px; }
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label {
+  font-size: 13px; font-weight: 600; color: var(--text);
+}
+.field .hint { font-size: 11px; color: var(--muted); }
+.field input, .field select, .field textarea {
+  font-family: inherit; font-size: 14px;
+  padding: 10px 12px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); background: #fff;
+  color: var(--text); width: 100%;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  outline: 2px solid var(--primary-50);
+  border-color: var(--primary);
+}
+.field textarea { min-height: 90px; resize: vertical; }
+.form-actions {
+  display: flex; justify-content: flex-end; gap: 8px;
+  margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.form-actions.between { justify-content: space-between; }
+
+.full-row { grid-column: 1 / -1; }
+
+.tabs {
+  display: flex; gap: 4px; border-bottom: 1px solid var(--border);
+  margin-bottom: 16px; flex-wrap: wrap;
+}
+.tab {
+  padding: 8px 14px; border-radius: 8px 8px 0 0;
+  cursor: pointer; font-weight: 600; font-size: 13px;
+  color: var(--muted); border: 1px solid transparent;
+  background: transparent;
+}
+.tab.active { color: var(--primary-600); background: var(--surface); border-color: var(--border); border-bottom-color: var(--surface); }
+
+.qr-box {
+  display: grid; place-items: center;
+  padding: 16px; background: #fff; border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+.share-link {
+  background: var(--surface-2); padding: 10px 12px;
+  border-radius: var(--radius-sm); font-family: monospace;
+  font-size: 12px; word-break: break-all;
+  border: 1px solid var(--border);
+}
+
+.import-preview {
+  max-height: 360px; overflow: auto;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.import-error {
+  background: #fee2e2; color: #b91c1c;
+  padding: 8px 12px; border-radius: var(--radius-sm);
+  margin-top: 8px; font-size: 13px;
+}
+.import-warning {
+  background: #fef3c7; color: #92400e;
+  padding: 8px 12px; border-radius: var(--radius-sm);
+  margin-top: 8px; font-size: 13px;
+}
+
+.detail-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  background: var(--surface); padding: 16px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+}
+.detail-grid .label { font-size: 12px; color: var(--muted); }
+.detail-grid .val { font-weight: 600; font-size: 15px; word-break: break-word; }
+
+.renew-bar {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  padding: 12px; background: var(--surface-2);
+  border-radius: var(--radius-sm); margin: 12px 0;
+}
+.renew-bar .label { align-self: center; font-size: 13px; color: var(--text); font-weight: 600; }
+
+.search-bar {
+  display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap;
+}
+.search-bar input {
+  flex: 1; min-width: 200px;
+  padding: 9px 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); font-family: inherit;
+}
+
+.filter-chip {
+  padding: 6px 12px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--border);
+  cursor: pointer; font-size: 12px; font-weight: 600;
+}
+.filter-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+  </style>
+</head>
+<body>
+  <div id="app" class="app-shell" data-state="loading"></div>
+
+  <template id="tpl-shell">
+    <aside class="sidebar" aria-label="القائمة الرئيسية">
+      <div class="brand">
+        <div class="brand-mark">م.ب</div>
+        <div class="brand-text">
+          <div class="brand-title">منصة الموارد البشرية</div>
+          <div class="brand-sub" data-est-name>—</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="#/dashboard" data-nav="dashboard"><span>🏠</span> الرئيسية</a>
+        <a href="#/branches" data-nav="branches"><span>🏢</span> الفروع</a>
+        <a href="#/registrations" data-nav="registrations"><span>📜</span> السجلات</a>
+        <a href="#/licenses" data-nav="licenses"><span>🛡️</span> التراخيص</a>
+        <a href="#/employees" data-nav="employees"><span>👥</span> العمالة</a>
+        <a href="#/import" data-nav="import"><span>📥</span> استيراد Excel</a>
+        <a href="#/share" data-nav="share"><span>🔗</span> الروابط الخارجية</a>
+        <a href="#/notifications" data-nav="notifications"><span>🔔</span> الإشعارات</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button type="button" class="btn-ghost" data-action="logout">تسجيل الخروج</button>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <button type="button" class="btn-icon" data-action="toggle-sidebar" aria-label="القائمة">☰</button>
+        <div class="topbar-title" data-page-title>الرئيسية</div>
+        <div class="topbar-actions">
+          <span class="user-chip" data-user-chip>—</span>
+        </div>
+      </header>
+      <section id="view" class="view"></section>
+    </main>
+  </template>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script>
+(() => {
+  // hr-platform/app/router.js
+  var routes = [];
+  var currentParams = {};
+  var onChange = null;
+  function defineRoutes(list, opts = {}) {
+    routes.length = 0;
+    list.forEach((r) => routes.push(compile(r)));
+    onChange = opts.onChange || null;
+  }
+  function compile({ pattern, view, public: isPublic }) {
+    const parts = pattern.replace(/^#?\/?/, "").split("/").filter(Boolean);
+    const keys = [];
+    const regexParts = parts.map((p) => {
+      if (p.startsWith(":")) {
+        keys.push(p.slice(1));
+        return "([^/]+)";
+      }
+      return p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    });
+    const regex = new RegExp("^" + (regexParts.join("/") || "") + "$");
+    return { pattern, regex, keys, view, public: !!isPublic };
+  }
+  function navigate(to) {
+    if (location.hash === to) {
+      handleRoute();
+    } else {
+      location.hash = to;
+    }
+  }
+  function currentHash() {
+    return location.hash || "#/";
+  }
+  function getQuery() {
+    const h = currentHash();
+    const qIdx = h.indexOf("?");
+    if (qIdx === -1) return {};
+    const search = h.slice(qIdx + 1);
+    return Object.fromEntries(new URLSearchParams(search));
+  }
+  function handleRoute() {
+    const h = currentHash();
+    const noQuery = h.split("?")[0];
+    const path = noQuery.replace(/^#?\/?/, "").replace(/\/$/, "");
+    for (const r of routes) {
+      const m = path.match(r.regex);
+      if (m) {
+        currentParams = {};
+        r.keys.forEach((k, i) => currentParams[k] = decodeURIComponent(m[i + 1]));
+        if (onChange) onChange(r);
+        return r.view({ params: currentParams, query: getQuery() });
+      }
+    }
+    const fallback = routes.find((r) => r.pattern === "#/" || r.pattern === "#/dashboard");
+    if (fallback) fallback.view({ params: {}, query: {} });
+  }
+  function startRouter() {
+    window.addEventListener("hashchange", handleRoute);
+    handleRoute();
+  }
+
+  // hr-platform/app/store.js
+  var KEY = "hr_platform.v1";
+  var empty = () => ({
+    establishments: {},
+    session: null,
+    branches: [],
+    registrations: [],
+    licenses: [],
+    employees: [],
+    pendingSubmissions: [],
+    activityLog: [],
+    shareTokens: {}
+  });
+  var state = load();
+  var subscribers = /* @__PURE__ */ new Set();
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return empty();
+      return { ...empty(), ...JSON.parse(raw) };
+    } catch {
+      return empty();
+    }
+  }
+  function persist() {
+    localStorage.setItem(KEY, JSON.stringify(state));
+    subscribers.forEach((fn) => {
+      try {
+        fn(state);
+      } catch (e) {
+        console.error(e);
+      }
+    });
+  }
+  var store = {
+    get state() {
+      return state;
+    },
+    subscribe(fn) {
+      subscribers.add(fn);
+      return () => subscribers.delete(fn);
+    },
+    reset() {
+      state = empty();
+      persist();
+    },
+    setSession(session) {
+      state.session = session;
+      persist();
+    },
+    clearSession() {
+      state.session = null;
+      persist();
+    },
+    currentEstId() {
+      return state.session?.establishmentId || null;
+    },
+    currentEst() {
+      const id = state.session?.establishmentId;
+      return id ? state.establishments[id] : null;
+    },
+    upsertEstablishment(est) {
+      state.establishments[est.id] = est;
+      persist();
+    },
+    getEstablishmentByEmail(email) {
+      return Object.values(state.establishments).find(
+        (e) => e.ownerEmail.toLowerCase() === email.toLowerCase()
+      );
+    },
+    list(collection, filterCurrent = true) {
+      const all = state[collection] || [];
+      if (!filterCurrent) return all;
+      const estId = this.currentEstId();
+      if (!estId) return [];
+      return all.filter((x) => x.estId === estId);
+    },
+    get(collection, id) {
+      const item2 = (state[collection] || []).find((x) => x.id === id);
+      if (!item2) return null;
+      const estId = this.currentEstId();
+      if (estId && item2.estId && item2.estId !== estId) return null;
+      return item2;
+    },
+    upsert(collection, item2) {
+      if (!state[collection]) state[collection] = [];
+      const idx = state[collection].findIndex((x) => x.id === item2.id);
+      if (idx >= 0) state[collection][idx] = item2;
+      else state[collection].push(item2);
+      persist();
+      return item2;
+    },
+    remove(collection, id) {
+      if (!state[collection]) return;
+      state[collection] = state[collection].filter((x) => x.id !== id);
+      persist();
+    },
+    appendActivity(entry) {
+      state.activityLog.unshift({
+        id: uid(),
+        ts: (/* @__PURE__ */ new Date()).toISOString(),
+        ...entry
+      });
+      if (state.activityLog.length > 500) state.activityLog.length = 500;
+      persist();
+    },
+    // share tokens stored by token id (not by establishment)
+    putShareToken(tokenId, info) {
+      state.shareTokens[tokenId] = info;
+      persist();
+    },
+    getShareToken(tokenId) {
+      return state.shareTokens[tokenId];
+    },
+    addPendingSubmission(sub) {
+      state.pendingSubmissions.unshift({ id: uid(), ...sub });
+      persist();
+    },
+    removePendingSubmission(id) {
+      state.pendingSubmissions = state.pendingSubmissions.filter((s) => s.id !== id);
+      persist();
+    },
+    exportAll() {
+      return JSON.parse(JSON.stringify(state));
+    },
+    importAll(snapshot) {
+      state = { ...empty(), ...snapshot };
+      persist();
+    }
+  };
+  function uid(prefix = "") {
+    return (prefix ? prefix + "_" : "") + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  // hr-platform/app/auth.js
+  async function sha256(input2) {
+    const data = new TextEncoder().encode(input2);
+    const hash = await crypto.subtle.digest("SHA-256", data);
+    return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  async function register({ estName, ownerName, ownerEmail, password }) {
+    if (!estName || !ownerEmail || !password) {
+      throw new Error("\u0627\u0644\u0631\u062C\u0627\u0621 \u062A\u0639\u0628\u0626\u0629 \u062C\u0645\u064A\u0639 \u0627\u0644\u062D\u0642\u0648\u0644 \u0627\u0644\u0645\u0637\u0644\u0648\u0628\u0629");
+    }
+    const existing = store.getEstablishmentByEmail(ownerEmail);
+    if (existing) throw new Error("\u064A\u0648\u062C\u062F \u062D\u0633\u0627\u0628 \u0645\u0633\u062C\u0651\u0644 \u0628\u0647\u0630\u0627 \u0627\u0644\u0628\u0631\u064A\u062F \u0628\u0627\u0644\u0641\u0639\u0644");
+    const passwordHash = await sha256(password);
+    const est = {
+      id: uid("est"),
+      name: estName,
+      ownerName: ownerName || "",
+      ownerEmail,
+      passwordHash,
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    store.upsertEstablishment(est);
+    store.setSession({ establishmentId: est.id, userEmail: ownerEmail });
+    return est;
+  }
+  async function login({ ownerEmail, password }) {
+    const est = store.getEstablishmentByEmail(ownerEmail || "");
+    if (!est) throw new Error("\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u062F\u062E\u0648\u0644 \u063A\u064A\u0631 \u0635\u062D\u064A\u062D\u0629");
+    const hash = await sha256(password);
+    if (hash !== est.passwordHash) throw new Error("\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u062F\u062E\u0648\u0644 \u063A\u064A\u0631 \u0635\u062D\u064A\u062D\u0629");
+    store.setSession({ establishmentId: est.id, userEmail: ownerEmail });
+    return est;
+  }
+  function logout() {
+    store.clearSession();
+  }
+  function isAuthed() {
+    return !!store.currentEstId();
+  }
+
+  // hr-platform/app/ui.js
+  function el(tag, attrs = {}, children = []) {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v == null || v === false) continue;
+      if (k === "class" || k === "className") node.className = v;
+      else if (k === "style" && typeof v === "object") Object.assign(node.style, v);
+      else if (k.startsWith("on") && typeof v === "function") {
+        node.addEventListener(k.slice(2).toLowerCase(), v);
+      } else if (k === "html") node.innerHTML = v;
+      else if (k === "dataset" && typeof v === "object") Object.assign(node.dataset, v);
+      else node.setAttribute(k, v);
+    }
+    appendChildren(node, children);
+    return node;
+  }
+  function appendChildren(node, children) {
+    if (children == null || children === false) return;
+    if (Array.isArray(children)) {
+      children.forEach((c) => appendChildren(node, c));
+      return;
+    }
+    if (children instanceof Node) {
+      node.appendChild(children);
+      return;
+    }
+    node.appendChild(document.createTextNode(String(children)));
+  }
+  function clear(node) {
+    while (node.firstChild) node.removeChild(node.firstChild);
+  }
+  function setView(content) {
+    const view = document.getElementById("view");
+    if (!view) return;
+    clear(view);
+    appendChildren(view, content);
+    view.scrollTop = 0;
+  }
+  function setPageTitle(title) {
+    const elTitle = document.querySelector("[data-page-title]");
+    if (elTitle) elTitle.textContent = title;
+    document.title = title + " \u2014 \u0645\u0646\u0635\u0629 \u0627\u0644\u0645\u0648\u0627\u0631\u062F \u0627\u0644\u0628\u0634\u0631\u064A\u0629";
+  }
+  function toast(message, type = "info") {
+    let host = document.querySelector(".toast-host");
+    if (!host) {
+      host = el("div", { class: "toast-host" });
+      document.body.appendChild(host);
+    }
+    const t = el("div", { class: `toast ${type}` }, message);
+    host.appendChild(t);
+    setTimeout(() => {
+      t.style.opacity = "0";
+      t.style.transition = "opacity .3s";
+      setTimeout(() => t.remove(), 300);
+    }, 2800);
+  }
+  function modal({ title, body, actions, onClose } = {}) {
+    const backdrop = el("div", { class: "modal-backdrop" });
+    const close = () => {
+      backdrop.remove();
+      if (onClose) onClose();
+    };
+    backdrop.addEventListener("click", (e) => {
+      if (e.target === backdrop) close();
+    });
+    const dialog = el("div", { class: "modal" }, [
+      title ? el("h3", {}, title) : null,
+      body,
+      actions ? el("div", { class: "form-actions" }, actions) : null
+    ]);
+    backdrop.appendChild(dialog);
+    document.body.appendChild(backdrop);
+    return { close, backdrop, dialog };
+  }
+  function confirmDialog(message) {
+    return new Promise((resolve) => {
+      const m = modal({
+        title: "\u062A\u0623\u0643\u064A\u062F",
+        body: el("p", {}, message),
+        actions: [
+          el("button", { class: "btn-ghost", type: "button", onClick: () => {
+            m.close();
+            resolve(false);
+          } }, "\u0625\u0644\u063A\u0627\u0621"),
+          el("button", { class: "btn-danger", type: "button", onClick: () => {
+            m.close();
+            resolve(true);
+          } }, "\u062A\u0623\u0643\u064A\u062F")
+        ],
+        onClose: () => resolve(false)
+      });
+    });
+  }
+  function todayISO() {
+    return (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  }
+  function formatDate(iso) {
+    if (!iso) return "\u2014";
+    try {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return iso;
+      return new Intl.DateTimeFormat("ar-SA-u-ca-gregory", {
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+      }).format(d);
+    } catch {
+      return iso;
+    }
+  }
+  function daysUntil(iso) {
+    if (!iso) return null;
+    const d = /* @__PURE__ */ new Date(iso + "T00:00:00");
+    const today = /* @__PURE__ */ new Date();
+    today.setHours(0, 0, 0, 0);
+    const diff = Math.round((d.getTime() - today.getTime()) / (1e3 * 60 * 60 * 24));
+    return diff;
+  }
+  function addMonths(iso, months) {
+    if (!iso) iso = todayISO();
+    const d = /* @__PURE__ */ new Date(iso + "T00:00:00");
+    d.setMonth(d.getMonth() + months);
+    return d.toISOString().slice(0, 10);
+  }
+  function severityFor(daysLeft) {
+    if (daysLeft == null) return "muted";
+    if (daysLeft < 0) return "expired";
+    if (daysLeft <= 30) return "urgent";
+    if (daysLeft <= 90) return "soon";
+    return "ok";
+  }
+  function severityPill(daysLeft) {
+    const sev = severityFor(daysLeft);
+    if (sev === "expired") return el("span", { class: "pill pill-danger" }, `\u0645\u0646\u062A\u0647\u064A\u0629 \u0645\u0646\u0630 ${Math.abs(daysLeft)} \u064A\u0648\u0645`);
+    if (sev === "urgent") return el("span", { class: "pill pill-warning" }, `\u0645\u062A\u0628\u0642\u064A ${daysLeft} \u064A\u0648\u0645`);
+    if (sev === "soon") return el("span", { class: "pill pill-info" }, `\u0645\u062A\u0628\u0642\u064A ${daysLeft} \u064A\u0648\u0645`);
+    if (sev === "ok") return el("span", { class: "pill pill-success" }, `\u0645\u062A\u0628\u0642\u064A ${daysLeft} \u064A\u0648\u0645`);
+    return el("span", { class: "pill pill-muted" }, "\u2014");
+  }
+  function field(labelText, control, hint) {
+    return el("div", { class: "field" }, [
+      el("label", {}, labelText),
+      control,
+      hint ? el("span", { class: "hint" }, hint) : null
+    ]);
+  }
+  function input(attrs = {}) {
+    return el("input", { type: "text", ...attrs });
+  }
+  function select(options, attrs = {}) {
+    const sel = el("select", attrs);
+    options.forEach((o) => {
+      const opt = document.createElement("option");
+      opt.value = o.value;
+      opt.textContent = o.label;
+      if (attrs.value === o.value) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    return sel;
+  }
+  function pageHeader(title, actions) {
+    return el("div", { class: "section-head" }, [
+      el("h2", {}, title),
+      actions ? el("div", { class: "btn-row" }, actions) : null
+    ]);
+  }
+
+  // hr-platform/app/seed.js
+  function addDays(iso, days) {
+    const d = /* @__PURE__ */ new Date((iso || todayISO()) + "T00:00:00");
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  }
+  async function loadDemoData() {
+    const estId = uid("est");
+    const passwordHash = await sha2562("demo123");
+    const est = {
+      id: estId,
+      name: "\u0645\u0624\u0633\u0633\u0629 \u0627\u0644\u0646\u0645\u0648\u0630\u062C \u0627\u0644\u062A\u062C\u0631\u064A\u0628\u064A",
+      ownerName: "\u062A\u062C\u0631\u064A\u0628\u064A",
+      ownerEmail: "demo@example.com",
+      passwordHash,
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    store.upsertEstablishment(est);
+    store.setSession({ establishmentId: estId, userEmail: est.ownerEmail });
+    const b1 = uid("br"), b2 = uid("br");
+    store.upsert("branches", { id: b1, estId, name: "\u0627\u0644\u0641\u0631\u0639 \u0627\u0644\u0631\u0626\u064A\u0633\u064A - \u0627\u0644\u0631\u064A\u0627\u0636", city: "\u0627\u0644\u0631\u064A\u0627\u0636", address: "\u062D\u064A \u0627\u0644\u0639\u0644\u064A\u0627", managerName: "\u0633\u0627\u0645\u064A", phone: "0501111111" });
+    store.upsert("branches", { id: b2, estId, name: "\u0641\u0631\u0639 \u062C\u062F\u0629", city: "\u062C\u062F\u0629", address: "\u062D\u064A \u0627\u0644\u0631\u0648\u0636\u0629", managerName: "\u0641\u0647\u062F", phone: "0502222222" });
+    store.upsert("registrations", {
+      id: uid("reg"),
+      estId,
+      type: "commercial",
+      number: "1010012345",
+      issueDate: "2020-03-01",
+      expiryDate: addMonths(todayISO(), 4),
+      attachments: []
+    });
+    store.upsert("registrations", {
+      id: uid("reg"),
+      estId,
+      type: "chamber",
+      number: "CH-552211",
+      issueDate: "2023-01-15",
+      expiryDate: addMonths(todayISO(), -10),
+      attachments: []
+    });
+    store.upsert("licenses", {
+      id: uid("lic"),
+      estId,
+      branchId: b1,
+      type: "municipal",
+      authority: "\u0623\u0645\u0627\u0646\u0629 \u0627\u0644\u0631\u064A\u0627\u0636",
+      number: "M-9988",
+      issueDate: "2023-06-01",
+      expiryDate: addMonths(todayISO(), 1),
+      attachments: []
+    });
+    store.upsert("licenses", {
+      id: uid("lic"),
+      estId,
+      branchId: b2,
+      type: "civil_defense",
+      authority: "\u0627\u0644\u062F\u0641\u0627\u0639 \u0627\u0644\u0645\u062F\u0646\u064A",
+      number: "CD-7741",
+      issueDate: "2024-02-10",
+      expiryDate: addMonths(todayISO(), 8),
+      attachments: []
+    });
+    store.upsert("employees", {
+      id: uid("emp"),
+      estId,
+      branchId: b1,
+      fullName: "\u0623\u062D\u0645\u062F \u0639\u0628\u062F\u0627\u0644\u0644\u0647",
+      nationality: "\u0633\u0639\u0648\u062F\u064A",
+      iqamaNumber: "",
+      iqamaExpiry: "",
+      jobTitle: "\u0645\u062F\u064A\u0631",
+      salary: "15000",
+      phone: "0503333333",
+      contractStart: "2022-01-01",
+      contractEnd: addMonths(todayISO(), 5),
+      contractType: "\u0645\u062D\u062F\u062F",
+      attachments: []
+    });
+    store.upsert("employees", {
+      id: uid("emp"),
+      estId,
+      branchId: b1,
+      fullName: "\u0633\u0627\u0645\u064A \u064A\u0648\u0633\u0641",
+      nationality: "\u0645\u0635\u0631\u064A",
+      iqamaNumber: "2234567890",
+      iqamaExpiry: addMonths(todayISO(), -3),
+      jobTitle: "\u0645\u062D\u0627\u0633\u0628",
+      salary: "5500",
+      phone: "0504444444",
+      contractStart: "2023-04-01",
+      contractEnd: addMonths(todayISO(), 2),
+      contractType: "\u0645\u062D\u062F\u062F",
+      attachments: []
+    });
+    store.upsert("employees", {
+      id: uid("emp"),
+      estId,
+      branchId: b2,
+      fullName: "\u0645\u062D\u0645\u062F \u0643\u0645\u0627\u0644",
+      nationality: "\u0628\u0646\u063A\u0627\u0644\u064A",
+      iqamaNumber: "2987654321",
+      iqamaExpiry: addDays(todayISO(), 12),
+      jobTitle: "\u0641\u0646\u064A",
+      salary: "3500",
+      phone: "0505555555",
+      contractStart: "2024-01-15",
+      contractEnd: addMonths(todayISO(), 11),
+      contractType: "\u0645\u062D\u062F\u062F",
+      attachments: []
+    });
+    store.upsert("employees", {
+      id: uid("emp"),
+      estId,
+      branchId: b2,
+      fullName: "\u0631\u0627\u062C \u0643\u0648\u0645\u0627\u0631",
+      nationality: "\u0647\u0646\u062F\u064A",
+      iqamaNumber: "2876543210",
+      iqamaExpiry: addMonths(todayISO(), 8),
+      jobTitle: "\u0633\u0627\u0626\u0642",
+      salary: "3000",
+      phone: "0506666666",
+      contractStart: "2024-06-01",
+      contractEnd: addMonths(todayISO(), 18),
+      contractType: "\u0645\u062D\u062F\u062F",
+      attachments: []
+    });
+    return est;
+  }
+  async function sha2562(input2) {
+    const data = new TextEncoder().encode(input2);
+    const hash = await crypto.subtle.digest("SHA-256", data);
+    return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  // hr-platform/app/views/login.js
+  function renderLogin(_ctx, app) {
+    const emailInput = input({ type: "email", placeholder: "owner@example.com", required: "", autocomplete: "email" });
+    const pwInput = input({ type: "password", placeholder: "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022", required: "", autocomplete: "current-password" });
+    const form = el("form", {
+      onSubmit: async (e) => {
+        e.preventDefault();
+        try {
+          await login({ ownerEmail: emailInput.value.trim(), password: pwInput.value });
+          toast("\u062A\u0645 \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u062E\u0648\u0644", "success");
+          navigate("#/dashboard");
+        } catch (err) {
+          toast(err.message, "error");
+        }
+      }
+    }, [
+      el("div", { class: "form-grid" }, [
+        field("\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A", emailInput),
+        field("\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631", pwInput)
+      ]),
+      el("div", { class: "form-actions between" }, [
+        el("button", { type: "button", class: "btn-ghost", onClick: async () => {
+          try {
+            await loadDemoData();
+            toast("\u062A\u0645 \u062A\u062D\u0645\u064A\u0644 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u062A\u062C\u0631\u064A\u0628\u064A\u0629", "success");
+            navigate("#/dashboard");
+          } catch (err) {
+            toast(err.message, "error");
+          }
+        } }, "\u0628\u064A\u0627\u0646\u0627\u062A \u062A\u062C\u0631\u064A\u0628\u064A\u0629"),
+        el("button", { type: "submit", class: "btn" }, "\u062F\u062E\u0648\u0644")
+      ])
+    ]);
+    const card = el("div", { class: "auth-card" }, [
+      el("h1", {}, "\u0645\u0646\u0635\u0629 \u0627\u0644\u0645\u0648\u0627\u0631\u062F \u0627\u0644\u0628\u0634\u0631\u064A\u0629"),
+      el("p", {}, "\u0633\u062C\u0651\u0644 \u062F\u062E\u0648\u0644 \u062D\u0633\u0627\u0628 \u0627\u0644\u0645\u0646\u0634\u0623\u0629 \u0644\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u0641\u0631\u0648\u0639 \u0648\u0627\u0644\u0639\u0645\u0627\u0644\u0629 \u0648\u0627\u0644\u0648\u062B\u0627\u0626\u0642."),
+      form,
+      el("div", { class: "auth-switch" }, [
+        "\u0644\u064A\u0633 \u0644\u062F\u064A\u0643 \u062D\u0633\u0627\u0628\u061F ",
+        el("a", { href: "#/register" }, "\u0625\u0646\u0634\u0627\u0621 \u062D\u0633\u0627\u0628 \u062C\u062F\u064A\u062F")
+      ])
+    ]);
+    app.appendChild(card);
+  }
+
+  // hr-platform/app/views/register.js
+  function renderRegister(_ctx, app) {
+    const estInput = input({ placeholder: "\u0645\u062B\u0644\u0627\u064B: \u0645\u0624\u0633\u0633\u0629 \u0627\u0644\u0645\u0633\u062A\u0642\u0628\u0644 \u0627\u0644\u062A\u062C\u0627\u0631\u064A\u0629", required: "" });
+    const nameInput = input({ placeholder: "\u0627\u0633\u0645 \u0627\u0644\u0645\u0633\u0624\u0648\u0644" });
+    const emailInput = input({ type: "email", placeholder: "owner@example.com", required: "" });
+    const pwInput = input({ type: "password", minlength: "6", required: "" });
+    const form = el("form", {
+      onSubmit: async (e) => {
+        e.preventDefault();
+        try {
+          await register({
+            estName: estInput.value.trim(),
+            ownerName: nameInput.value.trim(),
+            ownerEmail: emailInput.value.trim(),
+            password: pwInput.value
+          });
+          toast("\u062A\u0645 \u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u062D\u0633\u0627\u0628", "success");
+          navigate("#/dashboard");
+        } catch (err) {
+          toast(err.message, "error");
+        }
+      }
+    }, [
+      el("div", { class: "form-grid" }, [
+        field("\u0627\u0633\u0645 \u0627\u0644\u0645\u0646\u0634\u0623\u0629", estInput),
+        field("\u0627\u0633\u0645 \u0627\u0644\u0645\u0633\u0624\u0648\u0644", nameInput),
+        field("\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A", emailInput),
+        field("\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631", pwInput, "\u0666 \u0623\u062D\u0631\u0641 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644")
+      ]),
+      el("div", { class: "form-actions" }, [
+        el("button", { type: "submit", class: "btn" }, "\u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u062D\u0633\u0627\u0628")
+      ])
+    ]);
+    const card = el("div", { class: "auth-card" }, [
+      el("h1", {}, "\u062A\u0633\u062C\u064A\u0644 \u0645\u0646\u0634\u0623\u0629 \u062C\u062F\u064A\u062F\u0629"),
+      el("p", {}, "\u0623\u0646\u0634\u0626 \u062D\u0633\u0627\u0628 \u0645\u0646\u0634\u0623\u062A\u0643 \u0644\u062A\u0628\u062F\u0623 \u0625\u062F\u0627\u0631\u0629 \u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0639\u0645\u0627\u0644\u0629 \u0648\u0627\u0644\u0648\u062B\u0627\u0626\u0642."),
+      form,
+      el("div", { class: "auth-switch" }, [
+        "\u0644\u062F\u064A\u0643 \u062D\u0633\u0627\u0628\u061F ",
+        el("a", { href: "#/login" }, "\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u062E\u0648\u0644")
+      ])
+    ]);
+    app.appendChild(card);
+  }
+
+  // hr-platform/app/alerts.js
+  var KIND_LABELS = {
+    registration: "\u0633\u062C\u0644 \u062A\u062C\u0627\u0631\u064A",
+    license: "\u062A\u0631\u062E\u064A\u0635",
+    iqama: "\u0625\u0642\u0627\u0645\u0629",
+    contract: "\u0639\u0642\u062F \u0639\u0645\u0644"
+  };
+  function computeAlerts() {
+    const groups = {
+      registration: [],
+      license: [],
+      iqama: [],
+      contract: []
+    };
+    store.list("registrations").forEach((r) => {
+      groups.registration.push(makeItem({
+        kind: "registration",
+        refId: r.id,
+        title: r.type === "commercial" ? "\u0633\u062C\u0644 \u062A\u062C\u0627\u0631\u064A" : "\u0639\u0636\u0648\u064A\u0629 \u063A\u0631\u0641\u0629",
+        subtitle: "\u0631\u0642\u0645: " + (r.number || "\u2014"),
+        expiry: r.expiryDate,
+        link: `#/registrations/${r.id}`
+      }));
+    });
+    store.list("licenses").forEach((l) => {
+      groups.license.push(makeItem({
+        kind: "license",
+        refId: l.id,
+        title: licenseTypeLabel(l.type) + " \u2014 " + (l.authority || ""),
+        subtitle: "\u0631\u0642\u0645: " + (l.number || "\u2014"),
+        expiry: l.expiryDate,
+        link: `#/licenses/${l.id}`
+      }));
+    });
+    store.list("employees").forEach((e) => {
+      if (e.iqamaExpiry) {
+        groups.iqama.push(makeItem({
+          kind: "iqama",
+          refId: e.id,
+          title: e.fullName,
+          subtitle: "\u0631\u0642\u0645 \u0627\u0644\u0625\u0642\u0627\u0645\u0629: " + (e.iqamaNumber || "\u2014"),
+          expiry: e.iqamaExpiry,
+          link: `#/employees/${e.id}`
+        }));
+      }
+      if (e.contractEnd) {
+        groups.contract.push(makeItem({
+          kind: "contract",
+          refId: e.id,
+          title: e.fullName,
+          subtitle: e.jobTitle || "",
+          expiry: e.contractEnd,
+          link: `#/employees/${e.id}`
+        }));
+      }
+    });
+    Object.values(groups).forEach(
+      (arr) => arr.sort((a, b) => (a.daysLeft ?? 99999) - (b.daysLeft ?? 99999))
+    );
+    return groups;
+  }
+  function makeItem({ kind, refId, title, subtitle, expiry, link }) {
+    const daysLeft = daysUntil(expiry);
+    return {
+      kind,
+      refId,
+      title,
+      subtitle,
+      expiry,
+      link,
+      daysLeft,
+      severity: severityFor(daysLeft)
+    };
+  }
+  function licenseTypeLabel(t) {
+    return {
+      municipal: "\u0628\u0644\u062F\u064A",
+      civil_defense: "\u062F\u0641\u0627\u0639 \u0645\u062F\u0646\u064A",
+      other: "\u062A\u0631\u062E\u064A\u0635"
+    }[t] || "\u062A\u0631\u062E\u064A\u0635";
+  }
+  function summaryStats() {
+    const all = computeAlerts();
+    const counts = { expired: 0, urgent: 0, soon: 0, ok: 0 };
+    Object.values(all).forEach((arr) => {
+      arr.forEach((it) => {
+        counts[it.severity] = (counts[it.severity] || 0) + 1;
+      });
+    });
+    return {
+      counts,
+      totals: {
+        branches: store.list("branches").length,
+        employees: store.list("employees").length,
+        licenses: store.list("licenses").length,
+        registrations: store.list("registrations").length
+      }
+    };
+  }
+
+  // hr-platform/app/notifications.js
+  var CHANNEL_LABELS = {
+    "in-app": "\u062A\u0646\u0628\u064A\u0647 \u062F\u0627\u062E\u0644\u064A",
+    email: "\u0628\u0631\u064A\u062F \u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A",
+    sms: "\u0631\u0633\u0627\u0644\u0629 SMS",
+    whatsapp: "\u0648\u0627\u062A\u0633\u0627\u0628"
+  };
+  function logChannelLabel(type) {
+    return CHANNEL_LABELS[type] || type;
+  }
+  function sendMockNotification({ channel, to, subject, body }) {
+    store.appendActivity({
+      type: channel,
+      to: to || "",
+      subject: subject || "",
+      body: body || "",
+      status: "mock-sent"
+    });
+  }
+  function sendBatchAlert(items, channels = ["in-app"]) {
+    if (!items || !items.length) return 0;
+    let count = 0;
+    channels.forEach((channel) => {
+      items.forEach((it) => {
+        sendMockNotification({
+          channel,
+          to: channel === "in-app" ? "\u0644\u0648\u062D\u0629 \u0627\u0644\u062A\u062D\u0643\u0645" : "\u0645\u0633\u0624\u0648\u0644 HR",
+          subject: `\u062A\u0646\u0628\u064A\u0647: ${it.title} \u2014 ${labelKind(it.kind)}`,
+          body: `\u0627\u0644\u0627\u0646\u062A\u0647\u0627\u0621 \u0628\u062A\u0627\u0631\u064A\u062E ${it.expiry}\u060C \u0645\u062A\u0628\u0642\u064A ${it.daysLeft} \u064A\u0648\u0645`
+        });
+        count++;
+      });
+    });
+    return count;
+  }
+  function labelKind(kind) {
+    return {
+      registration: "\u0633\u062C\u0644 \u062A\u062C\u0627\u0631\u064A",
+      license: "\u062A\u0631\u062E\u064A\u0635",
+      iqama: "\u0625\u0642\u0627\u0645\u0629",
+      contract: "\u0639\u0642\u062F \u0639\u0645\u0644"
+    }[kind] || kind;
+  }
+
+  // hr-platform/app/views/dashboard.js
+  function renderDashboard() {
+    const stats = summaryStats();
+    const groups = computeAlerts();
+    const kpis = el("div", { class: "kpi-grid" }, [
+      kpi("\u{1F3E2}", stats.totals.branches, "\u0627\u0644\u0641\u0631\u0648\u0639"),
+      kpi("\u{1F4DC}", stats.totals.registrations, "\u0627\u0644\u0633\u062C\u0644\u0627\u062A"),
+      kpi("\u{1F6E1}\uFE0F", stats.totals.licenses, "\u0627\u0644\u062A\u0631\u0627\u062E\u064A\u0635"),
+      kpi("\u{1F465}", stats.totals.employees, "\u0627\u0644\u0639\u0645\u0627\u0644\u0629"),
+      kpi("\u{1F534}", stats.counts.expired || 0, "\u0645\u0646\u062A\u0647\u064A\u0629"),
+      kpi("\u{1F7E0}", stats.counts.urgent || 0, "\u0639\u0627\u062C\u0644\u0629 (\u2264\u0663\u0660 \u064A\u0648\u0645)"),
+      kpi("\u{1F7E1}", stats.counts.soon || 0, "\u0642\u0631\u064A\u0628\u0629 (\u2264\u0669\u0660 \u064A\u0648\u0645)")
+    ]);
+    const cards = el("div", { class: "alert-grid" }, [
+      alertCard("\u0627\u0644\u0633\u062C\u0644\u0627\u062A \u0627\u0644\u062A\u062C\u0627\u0631\u064A\u0629", groups.registration),
+      alertCard("\u0627\u0644\u062A\u0631\u0627\u062E\u064A\u0635", groups.license),
+      alertCard("\u0625\u0642\u0627\u0645\u0627\u062A \u0627\u0644\u0639\u0645\u0627\u0644\u0629", groups.iqama),
+      alertCard("\u0639\u0642\u0648\u062F \u0627\u0644\u0639\u0645\u0644", groups.contract)
+    ]);
+    const recentActivity = recentActivityCard();
+    setView([
+      pageHeader("\u0644\u0648\u062D\u0629 \u0627\u0644\u062A\u062D\u0643\u0645", [
+        el("button", { class: "btn", onClick: () => location.hash = "#/employees" }, "+ \u0625\u0636\u0627\u0641\u0629 \u0639\u0627\u0645\u0644"),
+        el("button", { class: "btn-secondary", onClick: () => location.hash = "#/import" }, "\u0627\u0633\u062A\u064A\u0631\u0627\u062F Excel")
+      ]),
+      kpis,
+      cards,
+      el("div", { class: "dash-row" }, [
+        criticalListCard(groups),
+        recentActivity
+      ])
+    ]);
+  }
+  function kpi(icon, value, label) {
+    return el("div", { class: "kpi" }, [
+      el("div", { class: "kpi-icon" }, icon),
+      el("div", {}, [
+        el("div", { class: "kpi-value" }, String(value)),
+        el("div", { class: "kpi-label" }, label)
+      ])
+    ]);
+  }
+  function alertCard(title, items) {
+    const needAttention = items.filter((i) => i.severity === "expired" || i.severity === "urgent" || i.severity === "soon");
+    const dominantSeverity = items.find((i) => i.severity === "expired") ? "expired" : items.find((i) => i.severity === "urgent") ? "urgent" : items.find((i) => i.severity === "soon") ? "soon" : "ok";
+    if (items.length === 0) {
+      return el("div", { class: "alert-card ok" }, [
+        el("div", { class: "alert-card-head" }, [el("span", {}, title), el("span", { class: "count" }, "0")]),
+        el("div", { class: "empty" }, "\u0644\u0627 \u062A\u0648\u062C\u062F \u0628\u064A\u0627\u0646\u0627\u062A \u0628\u0639\u062F")
+      ]);
+    }
+    return el("div", { class: `alert-card ${dominantSeverity}` }, [
+      el("div", { class: "alert-card-head" }, [
+        el("span", {}, title),
+        el("span", { class: "count" }, String(needAttention.length || items.length))
+      ]),
+      el("ul", { class: "alert-list" }, items.slice(0, 8).map((it) => el("li", {}, [
+        el("div", {}, [
+          el("a", { href: it.link }, it.title),
+          el("div", { class: "item-meta" }, [
+            it.subtitle ? it.subtitle + " \xB7 " : "",
+            "\u0627\u0646\u062A\u0647\u0627\u0621: ",
+            formatDate(it.expiry)
+          ])
+        ]),
+        severityPill(it.daysLeft)
+      ]))),
+      el("div", { class: "alert-card-foot" }, [
+        el("span", { class: "kpi-label" }, items.length > 8 ? `+${items.length - 8} \u0623\u062E\u0631\u0649` : `${items.length} \u0639\u0646\u0635\u0631`),
+        el("button", { class: "btn-ghost btn-sm", onClick: () => {
+          const sent = sendBatchAlert(needAttention, ["in-app", "email", "sms", "whatsapp"]);
+          toast(`\u062A\u0645 \u062A\u0633\u062C\u064A\u0644 ${sent} \u062A\u0646\u0628\u064A\u0647 (\u0645\u062D\u0627\u0643\u0627\u0629)`, "success");
+        } }, "\u0625\u0631\u0633\u0627\u0644 \u062A\u0646\u0628\u064A\u0647\u0627\u062A")
+      ])
+    ]);
+  }
+  function criticalListCard(groups) {
+    const all = Object.entries(groups).flatMap(
+      ([kind, arr]) => arr.filter((i) => i.severity === "expired" || i.severity === "urgent").map((i) => ({ ...i, kindLabel: KIND_LABELS[kind] }))
+    ).sort((a, b) => (a.daysLeft ?? 99999) - (b.daysLeft ?? 99999));
+    return el("div", { class: "card" }, [
+      el("h3", { style: { marginTop: 0 } }, "\u0627\u0644\u0625\u062C\u0631\u0627\u0621\u0627\u062A \u0627\u0644\u0639\u0627\u062C\u0644\u0629"),
+      all.length === 0 ? el("p", { class: "kpi-label" }, "\u0644\u0627 \u062A\u0648\u062C\u062F \u0648\u062B\u0627\u0626\u0642 \u0645\u0646\u062A\u0647\u064A\u0629 \u0623\u0648 \u0642\u0631\u064A\u0628\u0629 \u0627\u0644\u0627\u0646\u062A\u0647\u0627\u0621.") : el("ul", { class: "alert-list" }, all.slice(0, 12).map((it) => el("li", {}, [
+        el("div", {}, [
+          el("a", { href: it.link }, it.title),
+          el("div", { class: "item-meta" }, [
+            it.kindLabel + (it.subtitle ? " \xB7 " + it.subtitle : "") + " \xB7 ",
+            "\u0627\u0646\u062A\u0647\u0627\u0621: ",
+            formatDate(it.expiry)
+          ])
+        ]),
+        severityPill(it.daysLeft)
+      ])))
+    ]);
+  }
+  function recentActivityCard() {
+    const log = store.state.activityLog.slice(0, 8);
+    return el("div", { class: "card" }, [
+      el("h3", { style: { marginTop: 0 } }, "\u0622\u062E\u0631 \u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062A"),
+      log.length === 0 ? el("p", { class: "kpi-label" }, "\u0644\u0645 \u064A\u062A\u0645 \u0625\u0631\u0633\u0627\u0644 \u0625\u0634\u0639\u0627\u0631\u0627\u062A \u0628\u0639\u062F.") : el("ul", { class: "activity-list" }, log.map((a) => el("li", {}, [
+        el("div", { class: "ts" }, formatDate(a.ts) + " \xB7 " + (a.type === "in-app" ? "\u062F\u0627\u062E\u0644 \u0627\u0644\u0645\u0646\u0635\u0629" : a.type)),
+        el("div", {}, a.subject)
+      ]))),
+      el("a", { href: "#/notifications" }, "\u0639\u0631\u0636 \u0643\u0644 \u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062A \u2192")
+    ]);
+  }
+
+  // hr-platform/app/views/branches.js
+  function renderBranches() {
+    const items = store.list("branches");
+    setView([
+      pageHeader("\u0627\u0644\u0641\u0631\u0648\u0639", [
+        el("button", { class: "btn", onClick: () => openBranchForm() }, "+ \u0625\u0636\u0627\u0641\u0629 \u0641\u0631\u0639")
+      ]),
+      items.length === 0 ? el("div", { class: "empty" }, "\u0644\u0627 \u062A\u0648\u062C\u062F \u0641\u0631\u0648\u0639 \u0628\u0639\u062F. \u0627\u0628\u062F\u0623 \u0628\u0625\u0636\u0627\u0641\u0629 \u0641\u0631\u0639.") : el("div", { class: "table-wrap" }, el("table", { class: "data" }, [
+        el("thead", {}, el("tr", {}, [
+          el("th", {}, "\u0627\u0644\u0627\u0633\u0645"),
+          el("th", {}, "\u0627\u0644\u0645\u062F\u064A\u0646\u0629"),
+          el("th", {}, "\u0627\u0644\u0639\u0646\u0648\u0627\u0646"),
+          el("th", {}, "\u0627\u0644\u0645\u062F\u064A\u0631"),
+          el("th", {}, "\u0627\u0644\u062C\u0648\u0627\u0644"),
+          el("th", {}, "\u0625\u062C\u0631\u0627\u0621\u0627\u062A")
+        ])),
+        el("tbody", {}, items.map((b) => el("tr", {}, [
+          el("td", {}, b.name),
+          el("td", {}, b.city || "\u2014"),
+          el("td", {}, b.address || "\u2014"),
+          el("td", {}, b.managerName || "\u2014"),
+          el("td", {}, b.phone || "\u2014"),
+          el("td", {}, el("div", { class: "btn-row" }, [
+            el("button", { class: "btn-ghost btn-sm", onClick: () => openBranchForm(b) }, "\u062A\u0639\u062F\u064A\u0644"),
+            el("button", { class: "btn-danger btn-sm", onClick: async () => {
+              if (await confirmDialog("\u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0641\u0631\u0639\u061F")) {
+                store.remove("branches", b.id);
+                toast("\u062A\u0645 \u0627\u0644\u062D\u0630\u0641", "success");
+                renderBranches();
+              }
+            } }, "\u062D\u0630\u0641")
+          ]))
+        ])))
+      ]))
+    ]);
+  }
+  function renderBranchDetail({ params }) {
+    const b = store.get("branches", params.id);
+    if (!b) {
+      setView(el("div", { class: "empty" }, "\u0627\u0644\u0641\u0631\u0639 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F."));
+      return;
+    }
+    openBranchForm(b);
+    navigate("#/branches");
+  }
+  function openBranchForm(existing) {
+    const data = existing || {};
+    const name = input({ value: data.name || "", required: "" });
+    const city = input({ value: data.city || "" });
+    const address = input({ value: data.address || "" });
+    const manager = input({ value: data.managerName || "" });
+    const phone = input({ value: data.phone || "", type: "tel" });
+    const m = modal({
+      title: existing ? "\u062A\u0639\u062F\u064A\u0644 \u0641\u0631\u0639" : "\u0625\u0636\u0627\u0641\u0629 \u0641\u0631\u0639",
+      body: el("form", { id: "branch-form", onSubmit: (e) => {
+        e.preventDefault();
+        save();
+      } }, [
+        el("div", { class: "form-grid" }, [
+          field("\u0627\u0633\u0645 \u0627\u0644\u0641\u0631\u0639", name),
+          field("\u0627\u0644\u0645\u062F\u064A\u0646\u0629", city),
+          field("\u0627\u0644\u0639\u0646\u0648\u0627\u0646", address),
+          field("\u0627\u0633\u0645 \u0627\u0644\u0645\u062F\u064A\u0631", manager),
+          field("\u062C\u0648\u0627\u0644 \u0627\u0644\u0645\u062F\u064A\u0631", phone)
+        ])
+      ]),
+      actions: [
+        el("button", { type: "button", class: "btn-ghost", onClick: () => m.close() }, "\u0625\u0644\u063A\u0627\u0621"),
+        el("button", { type: "button", class: "btn", onClick: save }, "\u062D\u0641\u0638")
+      ]
+    });
+    function save() {
+      if (!name.value.trim()) {
+        toast("\u0627\u0633\u0645 \u0627\u0644\u0641\u0631\u0639 \u0645\u0637\u0644\u0648\u0628", "error");
+        return;
+      }
+      const item2 = {
+        id: existing?.id || uid("br"),
+        estId: store.currentEstId(),
+        name: name.value.trim(),
+        city: city.value.trim(),
+        address: address.value.trim(),
+        managerName: manager.value.trim(),
+        phone: phone.value.trim()
+      };
+      store.upsert("branches", item2);
+      toast("\u062A\u0645 \u0627\u0644\u062D\u0641\u0638", "success");
+      m.close();
+      renderBranches();
+    }
+  }
+
+  // hr-platform/app/views/registrations.js
+  var TYPES = [
+    { value: "commercial", label: "\u0633\u062C\u0644 \u062A\u062C\u0627\u0631\u064A" },
+    { value: "chamber", label: "\u0639\u0636\u0648\u064A\u0629 \u0627\u0644\u063A\u0631\u0641\u0629" }
+  ];
+  var TYPE_LABEL = Object.fromEntries(TYPES.map((t) => [t.value, t.label]));
+  function renderRegistrations() {
+    const items = store.list("registrations");
+    setView([
+      pageHeader("\u0627\u0644\u0633\u062C\u0644\u0627\u062A", [
+        el("button", { class: "btn", onClick: () => openForm() }, "+ \u0625\u0636\u0627\u0641\u0629 \u0633\u062C\u0644")
+      ]),
+      items.length === 0 ? el("div", { class: "empty" }, "\u0644\u0627 \u062A\u0648\u062C\u062F \u0633\u062C\u0644\u0627\u062A \u0628\u0639\u062F.") : el("div", { class: "table-wrap" }, el("table", { class: "data" }, [
+        el("thead", {}, el("tr", {}, [
+          el("th", {}, "\u0627\u0644\u0646\u0648\u0639"),
+          el("th", {}, "\u0627\u0644\u0631\u0642\u0645"),
+          el("th", {}, "\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0625\u0635\u062F\u0627\u0631"),
+          el("th", {}, "\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0627\u0646\u062A\u0647\u0627\u0621"),
+          el("th", {}, "\u0627\u0644\u062D\u0627\u0644\u0629"),
+          el("th", {}, "\u0625\u062C\u0631\u0627\u0621\u0627\u062A")
+        ])),
+        el("tbody", {}, items.map((r) => el("tr", {}, [
+          el("td", {}, TYPE_LABEL[r.type] || r.type),
+          el("td", {}, r.number || "\u2014"),
+          el("td", {}, formatDate(r.issueDate)),
+          el("td", {}, formatDate(r.expiryDate)),
+          el("td", {}, severityPill(daysUntil(r.expiryDate))),
+          el("td", {}, el("div", { class: "btn-row" }, [
+            el("button", { class: "btn-ghost btn-sm", onClick: () => openForm(r) }, "\u062A\u0639\u062F\u064A\u0644"),
+            el("button", { class: "btn-danger btn-sm", onClick: async () => {
+              if (await confirmDialog("\u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0633\u062C\u0644\u061F")) {
+                store.remove("registrations", r.id);
+                toast("\u062A\u0645 \u0627\u0644\u062D\u0630\u0641", "success");
+                renderRegistrations();
+              }
+            } }, "\u062D\u0630\u0641")
+          ]))
+        ])))
+      ]))
+    ]);
+  }
+  function renderRegistrationDetail({ params }) {
+    const r = store.get("registrations", params.id);
+    if (!r) {
+      setView(el("div", { class: "empty" }, "\u0627\u0644\u0633\u062C\u0644 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F."));
+      return;
+    }
+    openForm(r);
+    navigate("#/registrations");
+  }
+  function openForm(existing) {
+    const data = existing || {};
+    const type = select(TYPES, { value: data.type || "commercial" });
+    const number = input({ value: data.number || "" });
+    const issueDate = input({ type: "date", value: data.issueDate || "" });
+    const expiryDate = input({ type: "date", value: data.expiryDate || "", required: "" });
+    const m = modal({
+      title: existing ? "\u062A\u0639\u062F\u064A\u0644 \u0633\u062C\u0644" : "\u0625\u0636\u0627\u0641\u0629 \u0633\u062C\u0644",
+      body: el("div", { class: "form-grid" }, [
+        field("\u0627\u0644\u0646\u0648\u0639", type),
+        field("\u0627\u0644\u0631\u0642\u0645", number),
+        field("\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0625\u0635\u062F\u0627\u0631", issueDate),
+        field("\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0627\u0646\u062A\u0647\u0627\u0621", expiryDate)
+      ]),
+      actions: [
+        el("button", { type: "button", class: "btn-ghost", onClick: () => m.close() }, "\u0625\u0644\u063A\u0627\u0621"),
+        el("button", { type: "button", class: "btn", onClick: save }, "\u062D\u0641\u0638")
+      ]
+    });
+    function save() {
+      if (!expiryDate.value) {
+        toast("\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0627\u0646\u062A\u0647\u0627\u0621 \u0645\u0637\u0644\u0648\u0628", "error");
+        return;
+      }
+      const item2 = {
+        id: existing?.id || uid("reg"),
+        estId: store.currentEstId(),
+        type: type.value,
+        number: number.value.trim(),
+        issueDate: issueDate.value,
+        expiryDate: expiryDate.value,
+        attachments: existing?.attachments || []
+      };
+      store.upsert("registrations", item2);
+      toast("\u062A\u0645 \u0627\u0644\u062D\u0641\u0638", "success");
+      m.close();
+      renderRegistrations();
+    }
+  }
+
+  // hr-platform/app/views/licenses.js
+  var TYPES2 = [
+    { value: "municipal", label: "\u0628\u0644\u062F\u064A" },
+    { value: "civil_defense", label: "\u062F\u0641\u0627\u0639 \u0645\u062F\u0646\u064A" },
+    { value: "other", label: "\u0623\u062E\u0631\u0649" }
+  ];
+  var TYPE_LABEL2 = Object.fromEntries(TYPES2.map((t) => [t.value, t.label]));
+  function renderLicenses() {
+    const items = store.list("licenses");
+    const branches = store.list("branches");
+    const branchById = Object.fromEntries(branches.map((b) => [b.id, b.name]));
+    setView([
+      pageHeader("\u0627\u0644\u062A\u0631\u0627\u062E\u064A\u0635", [
+        el("button", { class: "btn", onClick: () => openForm2() }, "+ \u0625\u0636\u0627\u0641\u0629 \u062A\u0631\u062E\u064A\u0635")
+      ]),
+      items.length === 0 ? el("div", { class: "empty" }, "\u0644\u0627 \u062A\u0648\u062C\u062F \u062A\u0631\u0627\u062E\u064A\u0635 \u0628\u0639\u062F.") : el("div", { class: "table-wrap" }, el("table", { class: "data" }, [
+        el("thead", {}, el("tr", {}, [
+          el("th", {}, "\u0627\u0644\u0646\u0648\u0639"),
+          el("th", {}, "\u0627\u0644\u062C\u0647\u0629"),
+          el("th", {}, "\u0627\u0644\u0631\u0642\u0645"),
+          el("th", {}, "\u0627\u0644\u0641\u0631\u0639"),
+          el("th", {}, "\u0627\u0644\u0627\u0646\u062A\u0647\u0627\u0621"),
+          el("th", {}, "\u0627\u0644\u062D\u0627\u0644\u0629"),
+          el("th", {}, "\u0625\u062C\u0631\u0627\u0621\u0627\u062A")
+        ])),
+        el("tbody", {}, items.map((l) => el("tr", {}, [
+          el("td", {}, TYPE_LABEL2[l.type] || l.type),
+          el("td", {}, l.authority || "\u2014"),
+          el("td", {}, l.number || "\u2014"),
+          el("td", {}, branchById[l.branchId] || "\u2014"),
+          el("td", {}, formatDate(l.expiryDate)),
+          el("td", {}, severityPill(daysUntil(l.expiryDate))),
+          el("td", {}, el("div", { class: "btn-row" }, [
+            el("button", { class: "btn-ghost btn-sm", onClick: () => openForm2(l) }, "\u062A\u0639\u062F\u064A\u0644"),
+            el("button", { class: "btn-danger btn-sm", onClick: async () => {
+              if (await confirmDialog("\u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u062A\u0631\u062E\u064A\u0635\u061F")) {
+                store.remove("licenses", l.id);
+                toast("\u062A\u0645 \u0627\u0644\u062D\u0630\u0641", "success");
+                renderLicenses();
+              }
+            } }, "\u062D\u0630\u0641")
+          ]))
+        ])))
+      ]))
+    ]);
+  }
+  function renderLicenseDetail({ params }) {
+    const l = store.get("licenses", params.id);
+    if (!l) {
+      setView(el("div", { class: "empty" }, "\u0627\u0644\u062A\u0631\u062E\u064A\u0635 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F."));
+      return;
+    }
+    openForm2(l);
+    navigate("#/licenses");
+  }
+  function openForm2(existing) {
+    const data = existing || {};
+    const branches = store.list("branches");
+    const branchOptions = [{ value: "", label: "\u2014 \u0644\u0627 \u064A\u0648\u062C\u062F \u2014" }, ...branches.map((b) => ({ value: b.id, label: b.name }))];
+    const type = select(TYPES2, { value: data.type || "municipal" });
+    const authority = input({ value: data.authority || "" });
+    const number = input({ value: data.number || "" });
+    const branchSel = select(branchOptions, { value: data.branchId || "" });
+    const issueDate = input({ type: "date", value: data.issueDate || "" });
+    const expiryDate = input({ type: "date", value: data.expiryDate || "", required: "" });
+    const m = modal({
+      title: existing ? "\u062A\u0639\u062F\u064A\u0644 \u062A\u0631\u062E\u064A\u0635" : "\u0625\u0636\u0627\u0641\u0629 \u062A\u0631\u062E\u064A\u0635",
+      body: el("div", { class: "form-grid" }, [
+        field("\u0627\u0644\u0646\u0648\u0639", type),
+        field("\u0627\u0644\u062C\u0647\u0629 \u0627\u0644\u0645\u064F\u0635\u062F\u0650\u0631\u0629", authority, "\u0645\u062B\u0644: \u0623\u0645\u0627\u0646\u0629 \u0627\u0644\u0631\u064A\u0627\u0636"),
+        field("\u0631\u0642\u0645 \u0627\u0644\u062A\u0631\u062E\u064A\u0635", number),
+        field("\u0627\u0644\u0641\u0631\u0639", branchSel),
+        field("\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0625\u0635\u062F\u0627\u0631", issueDate),
+        field("\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0627\u0646\u062A\u0647\u0627\u0621", expiryDate)
+      ]),
+      actions: [
+        el("button", { type: "button", class: "btn-ghost", onClick: () => m.close() }, "\u0625\u0644\u063A\u0627\u0621"),
+        el("button", { type: "button", class: "btn", onClick: save }, "\u062D\u0641\u0638")
+      ]
+    });
+    function save() {
+      if (!expiryDate.value) {
+        toast("\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0627\u0646\u062A\u0647\u0627\u0621 \u0645\u0637\u0644\u0648\u0628", "error");
+        return;
+      }
+      const item2 = {
+        id: existing?.id || uid("lic"),
+        estId: store.currentEstId(),
+        type: type.value,
+        authority: authority.value.trim(),
+        number: number.value.trim(),
+        branchId: branchSel.value || null,
+        issueDate: issueDate.value,
+        expiryDate: expiryDate.value,
+        attachments: existing?.attachments || []
+      };
+      store.upsert("licenses", item2);
+      toast("\u062A\u0645 \u0627\u0644\u062D\u0641\u0638", "success");
+      m.close();
+      renderLicenses();
+    }
+  }
+
+  // cdn:xlsx
+  var X = window.XLSX;
+  var utils = X.utils;
+  var writeFile = X.writeFile;
+  var writeFileXLSX = X.writeFileXLSX;
+  var read = X.read;
+  var readFile = X.readFile;
+  var write = X.write;
+  var set_cptable = X.set_cptable;
+  var version = X.version;
+
+  // hr-platform/app/excel.js
+  var EMPLOYEE_COLUMNS = [
+    { key: "fullName", label: "\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0643\u0627\u0645\u0644", required: true },
+    { key: "nationality", label: "\u0627\u0644\u062C\u0646\u0633\u064A\u0629" },
+    { key: "iqamaNumber", label: "\u0631\u0642\u0645 \u0627\u0644\u0625\u0642\u0627\u0645\u0629" },
+    { key: "iqamaExpiry", label: "\u062A\u0627\u0631\u064A\u062E \u0627\u0646\u062A\u0647\u0627\u0621 \u0627\u0644\u0625\u0642\u0627\u0645\u0629", isDate: true },
+    { key: "jobTitle", label: "\u0627\u0644\u0648\u0638\u064A\u0641\u0629" },
+    { key: "salary", label: "\u0627\u0644\u0631\u0627\u062A\u0628" },
+    { key: "phone", label: "\u0627\u0644\u062C\u0648\u0627\u0644" },
+    { key: "contractStart", label: "\u062A\u0627\u0631\u064A\u062E \u0628\u062F\u0627\u064A\u0629 \u0627\u0644\u0639\u0642\u062F", isDate: true },
+    { key: "contractEnd", label: "\u062A\u0627\u0631\u064A\u062E \u0646\u0647\u0627\u064A\u0629 \u0627\u0644\u0639\u0642\u062F", isDate: true },
+    { key: "contractType", label: "\u0646\u0648\u0639 \u0627\u0644\u0639\u0642\u062F" },
+    { key: "branchName", label: "\u0627\u0644\u0641\u0631\u0639" }
+  ];
+  function downloadEmployeesTemplate() {
+    const headers = EMPLOYEE_COLUMNS.map((c) => c.label);
+    const sample = [
+      ["\u0623\u062D\u0645\u062F \u0645\u062D\u0645\u062F", "\u0633\u0639\u0648\u062F\u064A", "", "", "\u0645\u062F\u064A\u0631", "12000", "0501234567", "2024-01-01", "2025-01-01", "\u0645\u062D\u062F\u062F", "\u0627\u0644\u0631\u064A\u0627\u0636"],
+      ["\u0633\u0627\u0645\u064A \u0639\u0644\u064A", "\u0645\u0635\u0631\u064A", "2123456789", "2025-08-15", "\u0645\u062D\u0627\u0633\u0628", "5000", "0509876543", "2023-06-01", "2025-06-01", "\u0645\u062D\u062F\u062F", "\u062C\u062F\u0629"]
+    ];
+    const ws = utils.aoa_to_sheet([headers, ...sample]);
+    ws["!cols"] = headers.map(() => ({ wch: 18 }));
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, "Employees");
+    writeFile(wb, "employees-template.xlsx");
+  }
+  async function parseEmployeesFile(file) {
+    const buf = await file.arrayBuffer();
+    const wb = read(buf);
+    const wsName = wb.SheetNames[0];
+    const ws = wb.Sheets[wsName];
+    const rows = utils.sheet_to_json(ws, { defval: "", raw: false });
+    if (!rows.length) return { rows: [], errors: ["\u0627\u0644\u0645\u0644\u0641 \u0641\u0627\u0631\u063A \u0623\u0648 \u0644\u0627 \u064A\u062D\u062A\u0648\u064A \u0639\u0644\u0649 \u0628\u064A\u0627\u0646\u0627\u062A"] };
+    const labelToKey = Object.fromEntries(EMPLOYEE_COLUMNS.map((c) => [c.label, c.key]));
+    const result = [];
+    const errors = [];
+    rows.forEach((rawRow, i) => {
+      const lineNo = i + 2;
+      const r = {};
+      let hasAny = false;
+      Object.entries(rawRow).forEach(([k, v]) => {
+        const key = labelToKey[k.trim()] || k;
+        if (v !== "" && v != null) hasAny = true;
+        const col = EMPLOYEE_COLUMNS.find((c) => c.key === key);
+        if (col?.isDate && v) {
+          const norm = normalizeDate(v);
+          if (!norm) errors.push(`\u0627\u0644\u0633\u0637\u0631 ${lineNo}: \u062A\u0627\u0631\u064A\u062E \u063A\u064A\u0631 \u0635\u0627\u0644\u062D \u0641\u064A "${col.label}" (${v})`);
+          r[key] = norm || "";
+        } else {
+          r[key] = String(v || "").trim();
+        }
+      });
+      if (!hasAny) return;
+      if (!r.fullName) errors.push(`\u0627\u0644\u0633\u0637\u0631 ${lineNo}: \u062D\u0642\u0644 "\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0643\u0627\u0645\u0644" \u0645\u0637\u0644\u0648\u0628`);
+      result.push({ _line: lineNo, ...r });
+    });
+    return { rows: result, errors };
+  }
+  function commitEmployeesImport(parsedRows) {
+    const estId = store.currentEstId();
+    if (!estId) throw new Error("\u0644\u0627 \u062A\u0648\u062C\u062F \u062C\u0644\u0633\u0629");
+    const branchByName = {};
+    store.list("branches").forEach((b) => {
+      branchByName[b.name] = b.id;
+    });
+    let added = 0;
+    parsedRows.forEach((r) => {
+      const branchId = r.branchName ? branchByName[r.branchName] || null : null;
+      store.upsert("employees", {
+        id: uid("emp"),
+        estId,
+        branchId,
+        fullName: r.fullName,
+        nationality: r.nationality || "",
+        iqamaNumber: r.iqamaNumber || "",
+        iqamaExpiry: r.iqamaExpiry || "",
+        jobTitle: r.jobTitle || "",
+        salary: r.salary || "",
+        phone: r.phone || "",
+        contractStart: r.contractStart || "",
+        contractEnd: r.contractEnd || "",
+        contractType: r.contractType || "",
+        attachments: [],
+        createdAt: (/* @__PURE__ */ new Date()).toISOString()
+      });
+      added++;
+    });
+    return added;
+  }
+  function normalizeDate(v) {
+    if (!v) return "";
+    if (v instanceof Date && !isNaN(v.getTime())) return v.toISOString().slice(0, 10);
+    const s = String(v).trim();
+    const num = Number(s);
+    if (!isNaN(num) && num > 2e4 && num < 6e4) {
+      const epoch = new Date(Date.UTC(1899, 11, 30));
+      const d = new Date(epoch.getTime() + num * 864e5);
+      return d.toISOString().slice(0, 10);
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const m = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+    if (m) {
+      let [, d, mo, y] = m;
+      if (y.length === 2) y = "20" + y;
+      return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`;
+    }
+    const t = Date.parse(s);
+    if (!isNaN(t)) return new Date(t).toISOString().slice(0, 10);
+    return "";
+  }
+  function exportEmployeesExcel() {
+    const employees = store.list("employees");
+    const branchNameById = {};
+    store.list("branches").forEach((b) => {
+      branchNameById[b.id] = b.name;
+    });
+    const headers = EMPLOYEE_COLUMNS.map((c) => c.label);
+    const data = employees.map((e) => EMPLOYEE_COLUMNS.map((c) => {
+      if (c.key === "branchName") return branchNameById[e.branchId] || "";
+      return e[c.key] ?? "";
+    }));
+    const ws = utils.aoa_to_sheet([headers, ...data]);
+    ws["!cols"] = headers.map(() => ({ wch: 18 }));
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, "Employees");
+    writeFile(wb, `employees-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.xlsx`);
+  }
+
+  // hr-platform/app/views/employees.js
+  var CONTRACT_TYPES = [
+    { value: "\u0645\u062D\u062F\u062F", label: "\u0645\u062D\u062F\u062F \u0627\u0644\u0645\u062F\u0629" },
+    { value: "\u063A\u064A\u0631 \u0645\u062D\u062F\u062F", label: "\u063A\u064A\u0631 \u0645\u062D\u062F\u062F \u0627\u0644\u0645\u062F\u0629" }
+  ];
+  function renderEmployees() {
+    const items = store.list("employees");
+    const branches = store.list("branches");
+    const branchById = Object.fromEntries(branches.map((b) => [b.id, b.name]));
+    const search = input({ placeholder: "\u0628\u062D\u062B \u0628\u0627\u0644\u0627\u0633\u0645 \u0623\u0648 \u0631\u0642\u0645 \u0627\u0644\u0625\u0642\u0627\u0645\u0629..." });
+    const branchFilter = select(
+      [{ value: "", label: "\u0643\u0644 \u0627\u0644\u0641\u0631\u0648\u0639" }, ...branches.map((b) => ({ value: b.id, label: b.name }))],
+      {}
+    );
+    const tableHost = el("div", {});
+    function rerender() {
+      const q = search.value.trim().toLowerCase();
+      const bf = branchFilter.value;
+      const filtered = items.filter((e) => {
+        if (bf && e.branchId !== bf) return false;
+        if (q && !`${e.fullName} ${e.iqamaNumber} ${e.phone}`.toLowerCase().includes(q)) return false;
+        return true;
+      });
+      tableHost.replaceChildren(buildTable(filtered, branchById));
+    }
+    search.addEventListener("input", rerender);
+    branchFilter.addEventListener("change", rerender);
+    setView([
+      pageHeader("\u0627\u0644\u0639\u0645\u0627\u0644\u0629", [
+        el("button", { class: "btn", onClick: () => openForm3() }, "+ \u0625\u0636\u0627\u0641\u0629 \u0639\u0627\u0645\u0644"),
+        el("button", { class: "btn-secondary", onClick: () => exportEmployeesExcel() }, "\u062A\u0635\u062F\u064A\u0631 Excel")
+      ]),
+      el("div", { class: "search-bar" }, [search, branchFilter]),
+      tableHost
+    ]);
+    rerender();
+  }
+  function buildTable(items, branchById) {
+    if (items.length === 0) return el("div", { class: "empty" }, "\u0644\u0627 \u062A\u0648\u062C\u062F \u0628\u064A\u0627\u0646\u0627\u062A.");
+    return el("div", { class: "table-wrap" }, el("table", { class: "data" }, [
+      el("thead", {}, el("tr", {}, [
+        el("th", {}, "\u0627\u0644\u0627\u0633\u0645"),
+        el("th", {}, "\u0627\u0644\u0641\u0631\u0639"),
+        el("th", {}, "\u0627\u0644\u0648\u0638\u064A\u0641\u0629"),
+        el("th", {}, "\u0631\u0642\u0645 \u0627\u0644\u0625\u0642\u0627\u0645\u0629"),
+        el("th", {}, "\u0627\u0646\u062A\u0647\u0627\u0621 \u0627\u0644\u0625\u0642\u0627\u0645\u0629"),
+        el("th", {}, "\u0627\u0646\u062A\u0647\u0627\u0621 \u0627\u0644\u0639\u0642\u062F"),
+        el("th", {}, "\u0625\u062C\u0631\u0627\u0621\u0627\u062A")
+      ])),
+      el("tbody", {}, items.map((e) => el("tr", {}, [
+        el("td", {}, [
+          el("a", { href: `#/employees/${e.id}` }, e.fullName),
+          el("div", { class: "item-meta" }, e.nationality || "")
+        ]),
+        el("td", {}, branchById[e.branchId] || "\u2014"),
+        el("td", {}, e.jobTitle || "\u2014"),
+        el("td", {}, e.iqamaNumber || "\u2014"),
+        el("td", {}, [
+          formatDate(e.iqamaExpiry),
+          " ",
+          e.iqamaExpiry ? severityPill(daysUntil(e.iqamaExpiry)) : null
+        ]),
+        el("td", {}, [
+          formatDate(e.contractEnd),
+          " ",
+          e.contractEnd ? severityPill(daysUntil(e.contractEnd)) : null
+        ]),
+        el("td", {}, el("div", { class: "btn-row" }, [
+          el("a", { class: "btn-ghost btn-sm", href: `#/employees/${e.id}` }, "\u062A\u0641\u0627\u0635\u064A\u0644"),
+          el("button", { class: "btn-danger btn-sm", onClick: async () => {
+            if (await confirmDialog("\u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0639\u0627\u0645\u0644\u061F")) {
+              store.remove("employees", e.id);
+              toast("\u062A\u0645 \u0627\u0644\u062D\u0630\u0641", "success");
+              renderEmployees();
+            }
+          } }, "\u062D\u0630\u0641")
+        ]))
+      ])))
+    ]));
+  }
+  function openForm3(existing) {
+    const data = existing || {};
+    const branches = store.list("branches");
+    const branchOptions = [{ value: "", label: "\u2014 \u0628\u062F\u0648\u0646 \u0641\u0631\u0639 \u2014" }, ...branches.map((b) => ({ value: b.id, label: b.name }))];
+    const fullName = input({ value: data.fullName || "", required: "" });
+    const nationality = input({ value: data.nationality || "" });
+    const branchSel = select(branchOptions, { value: data.branchId || "" });
+    const jobTitle = input({ value: data.jobTitle || "" });
+    const salary = input({ value: data.salary || "", type: "number", min: "0" });
+    const phone = input({ value: data.phone || "", type: "tel" });
+    const iqamaNumber = input({ value: data.iqamaNumber || "" });
+    const iqamaExpiry = input({ type: "date", value: data.iqamaExpiry || "" });
+    const contractStart = input({ type: "date", value: data.contractStart || "" });
+    const contractEnd = input({ type: "date", value: data.contractEnd || "" });
+    const contractType = select([{ value: "", label: "\u2014" }, ...CONTRACT_TYPES], { value: data.contractType || "" });
+    const m = modal({
+      title: existing ? "\u062A\u0639\u062F\u064A\u0644 \u0639\u0627\u0645\u0644" : "\u0625\u0636\u0627\u0641\u0629 \u0639\u0627\u0645\u0644",
+      body: el("div", { class: "form-grid" }, [
+        field("\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0643\u0627\u0645\u0644", fullName),
+        field("\u0627\u0644\u062C\u0646\u0633\u064A\u0629", nationality),
+        field("\u0627\u0644\u0641\u0631\u0639", branchSel),
+        field("\u0627\u0644\u0648\u0638\u064A\u0641\u0629", jobTitle),
+        field("\u0627\u0644\u0631\u0627\u062A\u0628", salary),
+        field("\u0627\u0644\u062C\u0648\u0627\u0644", phone),
+        field("\u0631\u0642\u0645 \u0627\u0644\u0625\u0642\u0627\u0645\u0629", iqamaNumber),
+        field("\u0627\u0646\u062A\u0647\u0627\u0621 \u0627\u0644\u0625\u0642\u0627\u0645\u0629", iqamaExpiry),
+        field("\u0628\u062F\u0627\u064A\u0629 \u0627\u0644\u0639\u0642\u062F", contractStart),
+        field("\u0646\u0647\u0627\u064A\u0629 \u0627\u0644\u0639\u0642\u062F", contractEnd),
+        field("\u0646\u0648\u0639 \u0627\u0644\u0639\u0642\u062F", contractType)
+      ]),
+      actions: [
+        el("button", { type: "button", class: "btn-ghost", onClick: () => m.close() }, "\u0625\u0644\u063A\u0627\u0621"),
+        el("button", { type: "button", class: "btn", onClick: save }, "\u062D\u0641\u0638")
+      ]
+    });
+    function save() {
+      if (!fullName.value.trim()) {
+        toast("\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0643\u0627\u0645\u0644 \u0645\u0637\u0644\u0648\u0628", "error");
+        return;
+      }
+      const item2 = {
+        id: existing?.id || uid("emp"),
+        estId: store.currentEstId(),
+        branchId: branchSel.value || null,
+        fullName: fullName.value.trim(),
+        nationality: nationality.value.trim(),
+        jobTitle: jobTitle.value.trim(),
+        salary: salary.value,
+        phone: phone.value.trim(),
+        iqamaNumber: iqamaNumber.value.trim(),
+        iqamaExpiry: iqamaExpiry.value,
+        contractStart: contractStart.value,
+        contractEnd: contractEnd.value,
+        contractType: contractType.value,
+        attachments: existing?.attachments || [],
+        createdAt: existing?.createdAt || (/* @__PURE__ */ new Date()).toISOString()
+      };
+      store.upsert("employees", item2);
+      toast("\u062A\u0645 \u0627\u0644\u062D\u0641\u0638", "success");
+      m.close();
+      renderEmployees();
+    }
+  }
+
+  // hr-platform/app/views/employee-detail.js
+  function renderEmployeeDetail({ params }) {
+    const e = store.get("employees", params.id);
+    if (!e) {
+      setView(el("div", { class: "empty" }, "\u0627\u0644\u0639\u0627\u0645\u0644 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F."));
+      return;
+    }
+    const branch = e.branchId ? store.get("branches", e.branchId) : null;
+    const detail = el("div", { class: "detail-grid" }, [
+      item("\u0627\u0644\u0627\u0633\u0645", e.fullName),
+      item("\u0627\u0644\u062C\u0646\u0633\u064A\u0629", e.nationality),
+      item("\u0627\u0644\u0641\u0631\u0639", branch?.name || "\u2014"),
+      item("\u0627\u0644\u0648\u0638\u064A\u0641\u0629", e.jobTitle),
+      item("\u0627\u0644\u0631\u0627\u062A\u0628", e.salary ? `${e.salary} \u0631.\u0633` : "\u2014"),
+      item("\u0627\u0644\u062C\u0648\u0627\u0644", e.phone),
+      item("\u0631\u0642\u0645 \u0627\u0644\u0625\u0642\u0627\u0645\u0629", e.iqamaNumber),
+      item("\u0646\u0648\u0639 \u0627\u0644\u0639\u0642\u062F", e.contractType || "\u2014")
+    ]);
+    const iqamaSection = renewSection({
+      title: "\u0627\u0644\u0625\u0642\u0627\u0645\u0629",
+      expiryLabel: "\u062A\u0627\u0631\u064A\u062E \u0627\u0646\u062A\u0647\u0627\u0621 \u0627\u0644\u0625\u0642\u0627\u0645\u0629",
+      expiryValue: e.iqamaExpiry,
+      onRenew: (newDate, monthsAdded) => {
+        store.upsert("employees", { ...e, iqamaExpiry: newDate });
+        store.appendActivity({
+          type: "in-app",
+          to: "\u0633\u062C\u0644 \u0627\u0644\u0646\u0638\u0627\u0645",
+          subject: `\u062A\u062C\u062F\u064A\u062F \u0625\u0642\u0627\u0645\u0629 ${e.fullName}`,
+          body: `\u062A\u0645 \u062A\u0645\u062F\u064A\u062F \u0627\u0644\u0625\u0642\u0627\u0645\u0629 ${monthsAdded} \u0634\u0647\u0631 \u062D\u062A\u0649 ${newDate}`,
+          status: "mock-sent"
+        });
+        toast(`\u062A\u0645 \u062A\u062C\u062F\u064A\u062F \u0627\u0644\u0625\u0642\u0627\u0645\u0629 (+${monthsAdded} \u0634\u0647\u0631)`, "success");
+        renderEmployeeDetail({ params });
+      }
+    });
+    const contractSection = renewSection({
+      title: "\u0639\u0642\u062F \u0627\u0644\u0639\u0645\u0644",
+      expiryLabel: "\u062A\u0627\u0631\u064A\u062E \u0627\u0646\u062A\u0647\u0627\u0621 \u0627\u0644\u0639\u0642\u062F",
+      expiryValue: e.contractEnd,
+      onRenew: (newDate, monthsAdded) => {
+        store.upsert("employees", { ...e, contractEnd: newDate });
+        store.appendActivity({
+          type: "in-app",
+          to: "\u0633\u062C\u0644 \u0627\u0644\u0646\u0638\u0627\u0645",
+          subject: `\u062A\u062C\u062F\u064A\u062F \u0639\u0642\u062F ${e.fullName}`,
+          body: `\u062A\u0645 \u062A\u0645\u062F\u064A\u062F \u0627\u0644\u0639\u0642\u062F ${monthsAdded} \u0634\u0647\u0631 \u062D\u062A\u0649 ${newDate}`,
+          status: "mock-sent"
+        });
+        toast(`\u062A\u0645 \u062A\u062C\u062F\u064A\u062F \u0627\u0644\u0639\u0642\u062F (+${monthsAdded} \u0634\u0647\u0631)`, "success");
+        renderEmployeeDetail({ params });
+      }
+    });
+    setView([
+      pageHeader("\u062A\u0641\u0627\u0635\u064A\u0644 \u0627\u0644\u0639\u0627\u0645\u0644", [
+        el("button", { class: "btn-secondary", onClick: () => navigate("#/employees") }, "\u2192 \u0627\u0644\u0642\u0627\u0626\u0645\u0629"),
+        el("button", { class: "btn", onClick: () => {
+          openForm3(e);
+          setTimeout(() => renderEmployeeDetail({ params }), 50);
+        } }, "\u062A\u0639\u062F\u064A\u0644 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A")
+      ]),
+      detail,
+      iqamaSection,
+      contractSection
+    ]);
+  }
+  function item(label, value) {
+    return el("div", {}, [
+      el("div", { class: "label" }, label),
+      el("div", { class: "val" }, value || "\u2014")
+    ]);
+  }
+  function renewSection({ title, expiryLabel, expiryValue, onRenew }) {
+    const days = expiryValue ? daysUntil(expiryValue) : null;
+    return el("div", { class: "card", style: { marginTop: "14px" } }, [
+      el("h3", { style: { marginTop: 0 } }, title),
+      el("div", { class: "detail-grid", style: { padding: 0, border: 0 } }, [
+        item(expiryLabel, formatDate(expiryValue)),
+        el("div", {}, [
+          el("div", { class: "label" }, "\u0627\u0644\u062D\u0627\u0644\u0629"),
+          el("div", {}, expiryValue ? severityPill(days) : el("span", { class: "pill pill-muted" }, "\u063A\u064A\u0631 \u0645\u062D\u062F\u062F"))
+        ])
+      ]),
+      el("div", { class: "renew-bar" }, [
+        el("span", { class: "label" }, "\u062A\u062C\u062F\u064A\u062F \u0633\u0631\u064A\u0639:"),
+        renewBtn(3, expiryValue, onRenew),
+        renewBtn(6, expiryValue, onRenew),
+        renewBtn(12, expiryValue, onRenew),
+        el("button", { class: "btn-secondary btn-sm", onClick: () => openCustomRenew(expiryValue, onRenew) }, "\u062A\u0627\u0631\u064A\u062E \u0645\u062E\u0635\u0635")
+      ])
+    ]);
+  }
+  function renewBtn(months, current, onRenew) {
+    return el("button", {
+      class: "btn btn-sm",
+      onClick: () => onRenew(addMonths(current || todayISO(), months), months)
+    }, `+${months} \u0634\u0647\u0631`);
+  }
+  function openCustomRenew(current, onRenew) {
+    const dateInput = input({ type: "date", value: current || todayISO() });
+    const m = modal({
+      title: "\u062A\u062C\u062F\u064A\u062F \u0628\u062A\u0627\u0631\u064A\u062E \u0645\u062E\u0635\u0635",
+      body: el("div", { class: "form-grid" }, [
+        field("\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0627\u0646\u062A\u0647\u0627\u0621 \u0627\u0644\u062C\u062F\u064A\u062F", dateInput)
+      ]),
+      actions: [
+        el("button", { type: "button", class: "btn-ghost", onClick: () => m.close() }, "\u0625\u0644\u063A\u0627\u0621"),
+        el("button", { type: "button", class: "btn", onClick: () => {
+          if (!dateInput.value) {
+            toast("\u0627\u062E\u062A\u0631 \u062A\u0627\u0631\u064A\u062E\u0627\u064B", "error");
+            return;
+          }
+          onRenew(dateInput.value, "?");
+          m.close();
+        } }, "\u062D\u0641\u0638")
+      ]
+    });
+  }
+
+  // hr-platform/app/views/import.js
+  function renderImport() {
+    const fileInput = input({ type: "file", accept: ".xlsx,.xls,.csv" });
+    const previewHost = el("div", {});
+    let parsed = null;
+    fileInput.addEventListener("change", async () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      try {
+        parsed = await parseEmployeesFile(file);
+        previewHost.replaceChildren(buildPreview(parsed));
+      } catch (err) {
+        previewHost.replaceChildren(el("div", { class: "import-error" }, "\u0641\u0634\u0644 \u0642\u0631\u0627\u0621\u0629 \u0627\u0644\u0645\u0644\u0641: " + err.message));
+      }
+    });
+    setView([
+      pageHeader("\u0627\u0633\u062A\u064A\u0631\u0627\u062F \u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0639\u0645\u0627\u0644\u0629 \u0645\u0646 Excel"),
+      el("div", { class: "card" }, [
+        el("p", {}, "\u0627\u062A\u0628\u0639 \u0627\u0644\u062E\u0637\u0648\u0627\u062A \u0627\u0644\u062A\u0627\u0644\u064A\u0629 \u0644\u0627\u0633\u062A\u064A\u0631\u0627\u062F \u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0639\u0645\u0627\u0644\u0629:"),
+        el("ol", {}, [
+          el("li", {}, [
+            "\u062D\u0645\u0651\u0644 \u0642\u0627\u0644\u0628 Excel \u062C\u0627\u0647\u0632 ",
+            el("button", { class: "btn-ghost btn-sm", onClick: () => downloadEmployeesTemplate() }, "\u062A\u062D\u0645\u064A\u0644 \u0627\u0644\u0642\u0627\u0644\u0628")
+          ]),
+          el("li", {}, "\u0627\u0645\u0644\u0623 \u0627\u0644\u0635\u0641\u0648\u0641 \u0628\u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A (\u064A\u062F\u0639\u0645 \u0627\u0644\u0642\u0627\u0644\u0628 \u0627\u0644\u062A\u0648\u0627\u0631\u064A\u062E \u0628\u0635\u064A\u063A\u0629 yyyy-mm-dd \u0623\u0648 dd/mm/yyyy)."),
+          el("li", {}, "\u0627\u0631\u0641\u0639 \u0627\u0644\u0645\u0644\u0641 \u0647\u0646\u0627\u060C \u062A\u062D\u0642\u0642 \u0645\u0646 \u0627\u0644\u0645\u0639\u0627\u064A\u0646\u0629\u060C \u062B\u0645 \u0623\u0643\u0645\u0644 \u0627\u0644\u0627\u0633\u062A\u064A\u0631\u0627\u062F.")
+        ]),
+        el("div", { class: "form-grid" }, [
+          field("\u0645\u0644\u0641 Excel", fileInput)
+        ]),
+        el("p", { class: "hint" }, [
+          "\u0623\u0639\u0645\u062F\u0629 \u0627\u0644\u0642\u0627\u0644\u0628: ",
+          EMPLOYEE_COLUMNS.map((c) => c.label).join("\u060C ")
+        ]),
+        previewHost
+      ]),
+      el("div", { class: "card", style: { marginTop: "14px" } }, [
+        el("h3", { style: { marginTop: 0 } }, "\u062A\u0635\u062F\u064A\u0631"),
+        el("p", {}, "\u062A\u0635\u062F\u064A\u0631 \u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0639\u0645\u0627\u0644\u0629 \u0627\u0644\u062D\u0627\u0644\u064A\u0629 \u0625\u0644\u0649 \u0645\u0644\u0641 Excel."),
+        el("button", { class: "btn-secondary", onClick: () => exportEmployeesExcel() }, "\u062A\u0635\u062F\u064A\u0631 \u0627\u0644\u0639\u0645\u0627\u0644\u0629 \u0625\u0644\u0649 Excel")
+      ])
+    ]);
+    function buildPreview({ rows, errors }) {
+      if (!rows.length) {
+        return el("div", { class: "import-warning" }, "\u0644\u0627 \u062A\u0648\u062C\u062F \u0635\u0641\u0648\u0641 \u0644\u0644\u0627\u0633\u062A\u064A\u0631\u0627\u062F.");
+      }
+      const errorBox = errors.length ? el("div", { class: "import-warning" }, [
+        el("strong", {}, `${errors.length} \u0645\u0644\u0627\u062D\u0638\u0629:`),
+        el("ul", {}, errors.slice(0, 10).map((er) => el("li", {}, er))),
+        errors.length > 10 ? el("div", {}, `\u2026\u0648 ${errors.length - 10} \u0623\u062E\u0631\u0649`) : null
+      ]) : null;
+      const head = EMPLOYEE_COLUMNS.map((c) => c.label);
+      const previewRows = rows.slice(0, 20);
+      return el("div", {}, [
+        errorBox,
+        el("p", {}, `\u0633\u064A\u062A\u0645 \u0627\u0633\u062A\u064A\u0631\u0627\u062F ${rows.length} \u0635\u0641. (\u0627\u0644\u0645\u0639\u0627\u064A\u0646\u0629: \u0623\u0648\u0644 ${previewRows.length})`),
+        el("div", { class: "import-preview" }, el("table", { class: "data" }, [
+          el("thead", {}, el("tr", {}, head.map((h) => el("th", {}, h)))),
+          el("tbody", {}, previewRows.map((r) => el(
+            "tr",
+            {},
+            EMPLOYEE_COLUMNS.map((c) => el("td", {}, r[c.key] || "\u2014"))
+          )))
+        ])),
+        el("div", { class: "form-actions" }, [
+          el("button", { class: "btn", onClick: () => {
+            const added = commitEmployeesImport(rows);
+            toast(`\u062A\u0645 \u0627\u0633\u062A\u064A\u0631\u0627\u062F ${added} \u0639\u0627\u0645\u0644`, "success");
+            navigate("#/employees");
+          } }, `\u0627\u0633\u062A\u064A\u0631\u0627\u062F ${rows.length} \u0635\u0641`)
+        ])
+      ]);
+    }
+  }
+
+  // hr-platform/app/tokens.js
+  function base64url(bytes) {
+    const bin = Array.from(bytes).map((b) => String.fromCharCode(b)).join("");
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function fromBase64url(s) {
+    s = s.replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    const bin = atob(s);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+  }
+  async function createShareToken({ kind, expiresInDays = 30, label = "" }) {
+    const estId = store.currentEstId();
+    if (!estId) throw new Error("No active session");
+    const tid = uid("tok");
+    const payload = {
+      estId,
+      kind,
+      tid,
+      exp: Date.now() + expiresInDays * 86400 * 1e3
+    };
+    const json = JSON.stringify(payload);
+    const token = base64url(new TextEncoder().encode(json));
+    store.putShareToken(tid, {
+      estId,
+      kind,
+      label,
+      createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+      expiresAt: new Date(payload.exp).toISOString(),
+      revoked: false
+    });
+    return token;
+  }
+  async function verifyShareToken(token) {
+    if (!token || typeof token !== "string") return null;
+    let payload;
+    try {
+      const json = new TextDecoder().decode(fromBase64url(token));
+      payload = JSON.parse(json);
+    } catch {
+      return null;
+    }
+    if (!payload.estId || !payload.kind || !payload.tid) return null;
+    if (payload.exp && payload.exp < Date.now()) return null;
+    const meta = store.getShareToken(payload.tid);
+    if (meta && meta.revoked) return null;
+    return payload;
+  }
+  function publicLinkFor(token, kind) {
+    const base = location.origin + location.pathname;
+    return `${base}#/p/${kind}?t=${encodeURIComponent(token)}`;
+  }
+  function listEstablishmentTokens() {
+    const estId = store.currentEstId();
+    const all = store.state.shareTokens || {};
+    return Object.entries(all).filter(([, info]) => info.estId === estId).map(([tid, info]) => ({ tid, ...info })).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  }
+  function revokeShareToken(tid) {
+    const info = store.getShareToken(tid);
+    if (!info) return;
+    store.putShareToken(tid, { ...info, revoked: true });
+  }
+
+  // cdn:qrcode
+  var Q = window.QRCode;
+  var qrcode_default = Q;
+
+  // hr-platform/app/views/share-links.js
+  function renderShareLinks() {
+    const labelInput = input({ placeholder: "\u0645\u062B\u0627\u0644: \u0631\u0648\u0627\u0628\u0637 \u062F\u0641\u0639\u0629 \u062C\u0648\u0627\u0632\u0627\u062A \u0646\u0648\u0641\u0645\u0628\u0631" });
+    const kindSel = select([
+      { value: "worker", label: "\u0631\u0627\u0628\u0637 \u0644\u0644\u0639\u0627\u0645\u0644 (\u064A\u0639\u0628\u0626 \u0628\u064A\u0627\u0646\u0627\u062A\u0647 \u0628\u0646\u0641\u0633\u0647)" },
+      { value: "hr", label: "\u0631\u0627\u0628\u0637 \u0644\u0640 HR \u0645\u064A\u062F\u0627\u0646\u064A (\u0625\u062F\u062E\u0627\u0644 \u0645\u062A\u0639\u062F\u062F)" }
+    ], {});
+    const expiryInput = input({ type: "number", value: "30", min: "1", max: "365" });
+    setView([
+      pageHeader("\u0627\u0644\u0631\u0648\u0627\u0628\u0637 \u0627\u0644\u062E\u0627\u0631\u062C\u064A\u0629"),
+      el("div", { class: "card" }, [
+        el("h3", { style: { marginTop: 0 } }, "\u0625\u0646\u0634\u0627\u0621 \u0631\u0627\u0628\u0637 \u062C\u062F\u064A\u062F"),
+        el("p", { class: "hint" }, "\u0627\u0644\u0631\u0648\u0627\u0628\u0637 \u0645\u0624\u0642\u062A\u0629 \u0648\u0645\u0648\u0642\u0651\u0639\u0629. \u064A\u0646\u0635\u062D \u0628\u0625\u0644\u063A\u0627\u0621 \u0627\u0644\u0631\u0627\u0628\u0637 \u0628\u0639\u062F \u0627\u0633\u062A\u0644\u0627\u0645 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A."),
+        el("div", { class: "form-grid" }, [
+          field("\u0646\u0648\u0639 \u0627\u0644\u0631\u0627\u0628\u0637", kindSel),
+          field("\u0645\u062F\u0629 \u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0629 (\u0623\u064A\u0627\u0645)", expiryInput),
+          field("\u0648\u0635\u0641 \u0644\u0644\u0631\u0627\u0628\u0637 (\u0627\u062E\u062A\u064A\u0627\u0631\u064A)", labelInput)
+        ]),
+        el("div", { class: "form-actions" }, [
+          el("button", { class: "btn", onClick: async () => {
+            const days = parseInt(expiryInput.value, 10) || 30;
+            const token = await createShareToken({
+              kind: kindSel.value,
+              expiresInDays: days,
+              label: labelInput.value.trim()
+            });
+            const link = publicLinkFor(token, kindSel.value);
+            showLinkDialog(link, kindSel.options[kindSel.selectedIndex].textContent);
+            renderShareLinks();
+          } }, "\u0625\u0646\u0634\u0627\u0621 \u0631\u0627\u0628\u0637")
+        ])
+      ]),
+      pendingSubmissionsCard(),
+      tokenListCard()
+    ]);
+  }
+  function showLinkDialog(link, kindLabel) {
+    const qrCanvas = el("canvas", {});
+    qrcode_default.toCanvas(qrCanvas, link, { width: 220, margin: 1 }, (err) => {
+      if (err) console.error(err);
+    });
+    const m = modal({
+      title: "\u062A\u0645 \u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0631\u0627\u0628\u0637",
+      body: el("div", {}, [
+        el("p", {}, kindLabel + ":"),
+        el("div", { class: "qr-box" }, qrCanvas),
+        el("p", { class: "hint" }, "\u0627\u0645\u0633\u062D \u0627\u0644\u0631\u0645\u0632 \u0628\u0627\u0644\u062C\u0648\u0627\u0644 \u0623\u0648 \u0627\u0646\u0633\u062E \u0627\u0644\u0631\u0627\u0628\u0637:"),
+        el("div", { class: "share-link" }, link),
+        el("div", { class: "form-actions" }, [
+          el("button", { class: "btn-secondary", onClick: async () => {
+            try {
+              await navigator.clipboard.writeText(link);
+              toast("\u062A\u0645 \u0627\u0644\u0646\u0633\u062E", "success");
+            } catch {
+              toast("\u062A\u0639\u0630\u0631 \u0627\u0644\u0646\u0633\u062E \u062A\u0644\u0642\u0627\u0626\u064A\u0627\u064B", "error");
+            }
+          } }, "\u0646\u0633\u062E \u0627\u0644\u0631\u0627\u0628\u0637")
+        ])
+      ]),
+      actions: [
+        el("button", { class: "btn", onClick: () => m.close() }, "\u062A\u0645")
+      ]
+    });
+  }
+  function tokenListCard() {
+    const tokens = listEstablishmentTokens();
+    return el("div", { class: "card", style: { marginTop: "14px" } }, [
+      el("h3", { style: { marginTop: 0 } }, "\u0627\u0644\u0631\u0648\u0627\u0628\u0637 \u0627\u0644\u0646\u0634\u0637\u0629"),
+      tokens.length === 0 ? el("p", { class: "hint" }, "\u0644\u0627 \u062A\u0648\u062C\u062F \u0631\u0648\u0627\u0628\u0637 \u0628\u0639\u062F.") : el("div", { class: "table-wrap" }, el("table", { class: "data" }, [
+        el("thead", {}, el("tr", {}, [
+          el("th", {}, "\u0627\u0644\u0646\u0648\u0639"),
+          el("th", {}, "\u0627\u0644\u0648\u0635\u0641"),
+          el("th", {}, "\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0625\u0646\u0634\u0627\u0621"),
+          el("th", {}, "\u0627\u0644\u0627\u0646\u062A\u0647\u0627\u0621"),
+          el("th", {}, "\u0627\u0644\u062D\u0627\u0644\u0629"),
+          el("th", {}, "\u0625\u062C\u0631\u0627\u0621")
+        ])),
+        el("tbody", {}, tokens.map((t) => el("tr", {}, [
+          el("td", {}, t.kind === "worker" ? "\u0639\u0627\u0645\u0644" : "HR"),
+          el("td", {}, t.label || "\u2014"),
+          el("td", {}, formatDate(t.createdAt)),
+          el("td", {}, formatDate(t.expiresAt)),
+          el("td", {}, t.revoked ? el("span", { class: "pill pill-danger" }, "\u0645\u0644\u063A\u0649") : el("span", { class: "pill pill-success" }, "\u0646\u0634\u0637")),
+          el("td", {}, t.revoked ? "\u2014" : el("button", { class: "btn-danger btn-sm", onClick: async () => {
+            if (await confirmDialog("\u0625\u0644\u063A\u0627\u0621 \u0647\u0630\u0627 \u0627\u0644\u0631\u0627\u0628\u0637\u061F \u0644\u0646 \u064A\u0633\u062A\u0637\u064A\u0639 \u0627\u0644\u0645\u0633\u062A\u0644\u0645 \u062A\u0639\u0628\u0626\u062A\u0647 \u0628\u0639\u062F \u0630\u0644\u0643.")) {
+              revokeShareToken(t.tid);
+              toast("\u062A\u0645 \u0627\u0644\u0625\u0644\u063A\u0627\u0621", "success");
+              renderShareLinks();
+            }
+          } }, "\u0625\u0644\u063A\u0627\u0621"))
+        ])))
+      ]))
+    ]);
+  }
+  function pendingSubmissionsCard() {
+    const subs = store.list("pendingSubmissions");
+    const codeInput = el("textarea", { rows: "3", placeholder: "\u0627\u0644\u0635\u0642 \u0647\u0646\u0627 \u0643\u0648\u062F \u0627\u0644\u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u0630\u064A \u0648\u0635\u0644\u0643 \u0645\u0646 \u0627\u0644\u0639\u0627\u0645\u0644 \u0623\u0648 \u0645\u0646 \u0627\u0644\u0645\u064A\u062F\u0627\u0646..." });
+    return el("div", { class: "card", style: { marginTop: "14px" } }, [
+      el("h3", { style: { marginTop: 0 } }, "\u0637\u0644\u0628\u0627\u062A \u0645\u0639\u0644\u0642\u0629 \u0628\u0627\u0646\u062A\u0638\u0627\u0631 \u0627\u0644\u0645\u0631\u0627\u062C\u0639\u0629"),
+      el("div", { class: "field", style: { marginBottom: "12px" } }, [
+        el("label", {}, "\u0627\u0633\u062A\u0644\u0627\u0645 \u0643\u0648\u062F \u0625\u0631\u0633\u0627\u0644 (\u0645\u0646 \u062C\u0647\u0627\u0632 \u0622\u062E\u0631)"),
+        codeInput,
+        el("div", { class: "form-actions" }, [
+          el("button", { class: "btn-secondary btn-sm", onClick: () => importSubmissionCode(codeInput.value.trim()) }, "\u0627\u0633\u062A\u064A\u0631\u0627\u062F \u0627\u0644\u0643\u0648\u062F")
+        ])
+      ]),
+      subs.length === 0 ? el("p", { class: "hint" }, "\u0644\u0627 \u062A\u0648\u062C\u062F \u0637\u0644\u0628\u0627\u062A \u0645\u0639\u0644\u0642\u0629. \u0639\u0646\u062F \u062A\u0639\u0628\u0626\u0629 \u0627\u0644\u0639\u0627\u0645\u0644 \u0623\u0648 \u0645\u0648\u0638\u0641 HR \u0644\u0644\u0646\u0645\u0648\u0630\u062C \u0627\u0644\u062E\u0627\u0631\u062C\u064A\u060C \u0633\u062A\u0638\u0647\u0631 \u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0647\u0646\u0627 \u0644\u0644\u0645\u0631\u0627\u062C\u0639\u0629.") : el("div", { class: "table-wrap" }, el("table", { class: "data" }, [
+        el("thead", {}, el("tr", {}, [
+          el("th", {}, "\u0627\u0644\u0646\u0648\u0639"),
+          el("th", {}, "\u0627\u0644\u0627\u0633\u0645/\u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A"),
+          el("th", {}, "\u0648\u0642\u062A \u0627\u0644\u0625\u0631\u0633\u0627\u0644"),
+          el("th", {}, "\u0625\u062C\u0631\u0627\u0621\u0627\u062A")
+        ])),
+        el("tbody", {}, subs.map((s) => el("tr", {}, [
+          el("td", {}, s.kind === "worker" ? "\u0639\u0627\u0645\u0644" : "\u062F\u0641\u0639\u0629 HR"),
+          el("td", {}, summarizePayload(s)),
+          el("td", {}, formatDate(s.submittedAt)),
+          el("td", {}, el("div", { class: "btn-row" }, [
+            el("button", { class: "btn btn-sm", onClick: () => approveSubmission(s) }, "\u0642\u0628\u0648\u0644 \u0648\u062F\u0645\u062C"),
+            el("button", { class: "btn-danger btn-sm", onClick: async () => {
+              if (await confirmDialog("\u0631\u0641\u0636 \u0648\u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628\u061F")) {
+                store.removePendingSubmission(s.id);
+                renderShareLinks();
+              }
+            } }, "\u0631\u0641\u0636")
+          ]))
+        ])))
+      ]))
+    ]);
+  }
+  function importSubmissionCode(code) {
+    if (!code) {
+      toast("\u0627\u0644\u0635\u0642 \u0627\u0644\u0643\u0648\u062F \u0623\u0648\u0644\u0627\u064B", "error");
+      return;
+    }
+    try {
+      const padded = code.replace(/-/g, "+").replace(/_/g, "/") + "===".slice(0, (4 - code.length % 4) % 4);
+      const json = decodeURIComponent(escape(atob(padded)));
+      const data = JSON.parse(json);
+      if (!data.estId || !data.kind || !data.payload) throw new Error("\u0643\u0648\u062F \u063A\u064A\u0631 \u0635\u0627\u0644\u062D");
+      if (data.estId !== store.currentEstId()) {
+        toast("\u0627\u0644\u0643\u0648\u062F \u0644\u064A\u0633 \u0644\u0647\u0630\u0647 \u0627\u0644\u0645\u0646\u0634\u0623\u0629", "error");
+        return;
+      }
+      store.addPendingSubmission({
+        estId: data.estId,
+        kind: data.kind,
+        token: "imported-code",
+        payload: data.payload,
+        submittedAt: data.submittedAt || (/* @__PURE__ */ new Date()).toISOString()
+      });
+      toast("\u062A\u0645 \u0627\u0633\u062A\u064A\u0631\u0627\u062F \u0627\u0644\u0637\u0644\u0628\u060C \u064A\u0645\u0643\u0646\u0643 \u0645\u0631\u0627\u062C\u0639\u062A\u0647 \u0627\u0644\u0622\u0646", "success");
+      renderShareLinks();
+    } catch (err) {
+      toast("\u062A\u0639\u0630\u0631 \u0642\u0631\u0627\u0621\u0629 \u0627\u0644\u0643\u0648\u062F: \u062A\u0623\u0643\u062F \u0645\u0646 \u0635\u062D\u062A\u0647", "error");
+    }
+  }
+  function summarizePayload(s) {
+    if (s.kind === "worker") {
+      return s.payload?.fullName || "\u2014";
+    }
+    return `${s.payload?.length || 0} \u0639\u0627\u0645\u0644`;
+  }
+  function approveSubmission(s) {
+    const estId = store.currentEstId();
+    if (s.kind === "worker") {
+      const p = s.payload || {};
+      store.upsert("employees", {
+        id: "emp_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        estId,
+        branchId: null,
+        fullName: p.fullName || "",
+        nationality: p.nationality || "",
+        jobTitle: p.jobTitle || "",
+        salary: "",
+        phone: p.phone || "",
+        iqamaNumber: p.iqamaNumber || "",
+        iqamaExpiry: p.iqamaExpiry || "",
+        contractStart: p.contractStart || "",
+        contractEnd: p.contractEnd || "",
+        contractType: "",
+        attachments: [],
+        createdAt: (/* @__PURE__ */ new Date()).toISOString()
+      });
+    } else if (s.kind === "hr-batch") {
+      (s.payload || []).forEach((p) => {
+        store.upsert("employees", {
+          id: "emp_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+          estId,
+          branchId: null,
+          fullName: p.fullName || "",
+          nationality: p.nationality || "",
+          jobTitle: p.jobTitle || "",
+          salary: "",
+          phone: p.phone || "",
+          iqamaNumber: p.iqamaNumber || "",
+          iqamaExpiry: p.iqamaExpiry || "",
+          contractStart: "",
+          contractEnd: "",
+          contractType: "",
+          attachments: [],
+          createdAt: (/* @__PURE__ */ new Date()).toISOString()
+        });
+      });
+    }
+    store.removePendingSubmission(s.id);
+    toast("\u062A\u0645 \u0627\u0644\u0642\u0628\u0648\u0644 \u0648\u0627\u0644\u062F\u0645\u062C", "success");
+    renderShareLinks();
+  }
+
+  // hr-platform/app/views/notifications-view.js
+  function renderNotifications() {
+    const log = store.state.activityLog;
+    setView([
+      pageHeader("\u0633\u062C\u0644 \u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062A", [
+        log.length > 0 ? el("button", { class: "btn-danger", onClick: async () => {
+          if (await confirmDialog("\u0645\u0633\u062D \u0643\u0644 \u0633\u062C\u0644 \u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062A\u061F")) {
+            const snap = store.exportAll();
+            snap.activityLog = [];
+            store.importAll(snap);
+            toast("\u062A\u0645 \u0627\u0644\u0645\u0633\u062D", "success");
+            renderNotifications();
+          }
+        } }, "\u0645\u0633\u062D \u0627\u0644\u0633\u062C\u0644") : null
+      ]),
+      el("div", { class: "card" }, [
+        el("p", { class: "hint" }, "\u0647\u0630\u0627 \u0627\u0644\u0633\u062C\u0644 \u064A\u0639\u0631\u0636 \u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062A \u0627\u0644\u062A\u064A \u0623\u064F\u0631\u0633\u0644\u062A \u0645\u0646 \u0627\u0644\u0645\u0646\u0635\u0629. \u0641\u064A \u0627\u0644\u0646\u0645\u0648\u0630\u062C \u0627\u0644\u0623\u0648\u0644\u064A\u060C \u0627\u0644\u0625\u064A\u0645\u064A\u0644/SMS/\u0648\u0627\u062A\u0633\u0627\u0628 \u064A\u064F\u0633\u062C\u0651\u0644\u0648\u0646 \u0647\u0646\u0627 \u0641\u0642\u0637 (\u0645\u062D\u0627\u0643\u0627\u0629) \u2014 \u0639\u0646\u062F \u0631\u0628\u0637 \u0628\u0627\u0643\u0646\u062F \u062D\u0642\u064A\u0642\u064A \u0633\u062A\u064F\u0631\u0633\u064E\u0644 \u0641\u0639\u0644\u064A\u0627\u064B \u0644\u0644\u0645\u0633\u062A\u0644\u0645\u064A\u0646."),
+        log.length === 0 ? el("div", { class: "empty" }, "\u0644\u0627 \u062A\u0648\u062C\u062F \u0625\u0634\u0639\u0627\u0631\u0627\u062A \u0628\u0639\u062F.") : el("div", { class: "table-wrap" }, el("table", { class: "data" }, [
+          el("thead", {}, el("tr", {}, [
+            el("th", {}, "\u0627\u0644\u0648\u0642\u062A"),
+            el("th", {}, "\u0627\u0644\u0642\u0646\u0627\u0629"),
+            el("th", {}, "\u0627\u0644\u0645\u0633\u062A\u0644\u0645"),
+            el("th", {}, "\u0627\u0644\u0645\u0648\u0636\u0648\u0639"),
+            el("th", {}, "\u0627\u0644\u062A\u0641\u0627\u0635\u064A\u0644"),
+            el("th", {}, "\u0627\u0644\u062D\u0627\u0644\u0629")
+          ])),
+          el("tbody", {}, log.map((a) => el("tr", {}, [
+            el("td", {}, formatDate(a.ts)),
+            el("td", {}, logChannelLabel(a.type)),
+            el("td", {}, a.to || "\u2014"),
+            el("td", {}, a.subject || "\u2014"),
+            el("td", {}, a.body || "\u2014"),
+            el("td", {}, el("span", { class: "pill pill-success" }, "\u0645\u064F\u0631\u0633\u0644 (\u0645\u062D\u0627\u0643\u0627\u0629)"))
+          ])))
+        ]))
+      ])
+    ]);
+  }
+
+  // hr-platform/app/views/public-worker.js
+  async function renderPublicWorker(_ctx, app) {
+    const params = new URLSearchParams(location.hash.split("?")[1] || "");
+    const token = params.get("t") || "";
+    const payload = await verifyShareToken(token);
+    const card = el("div", { class: "card" }, []);
+    const wrap = el("div", { class: "public-page" }, [card]);
+    app.appendChild(wrap);
+    if (!payload || payload.kind !== "worker") {
+      card.appendChild(el("h1", {}, "\u0627\u0644\u0631\u0627\u0628\u0637 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D"));
+      card.appendChild(el("p", {}, "\u0627\u0644\u0631\u0627\u0628\u0637 \u0645\u0646\u062A\u0647\u064A \u0623\u0648 \u0645\u0644\u063A\u0649. \u062A\u0648\u0627\u0635\u0644 \u0645\u0639 \u062C\u0647\u0629 \u0627\u0644\u0639\u0645\u0644 \u0644\u0625\u0635\u062F\u0627\u0631 \u0631\u0627\u0628\u0637 \u062C\u062F\u064A\u062F."));
+      return;
+    }
+    const est = store.state.establishments[payload.estId];
+    card.appendChild(el("h1", {}, "\u062A\u0639\u0628\u0626\u0629 \u0628\u064A\u0627\u0646\u0627\u062A\u0643"));
+    card.appendChild(el("p", {}, [
+      "\u0645\u0631\u062D\u0628\u0627\u064B\u060C \u0627\u0644\u0631\u062C\u0627\u0621 \u062A\u0639\u0628\u0626\u0629 \u0628\u064A\u0627\u0646\u0627\u062A\u0643. \u0633\u064A\u062A\u0645 \u0625\u0631\u0633\u0627\u0644\u0647\u0627 \u0625\u0644\u0649 ",
+      el("strong", {}, est?.name || "\u062C\u0647\u0629 \u0627\u0644\u0639\u0645\u0644"),
+      " \u0644\u0644\u0645\u0631\u0627\u062C\u0639\u0629."
+    ]));
+    const fullName = input({ required: "" });
+    const nationality = input({});
+    const iqamaNumber = input({});
+    const iqamaExpiry = input({ type: "date" });
+    const phone = input({ type: "tel" });
+    const jobTitle = input({});
+    const contractStart = input({ type: "date" });
+    const contractEnd = input({ type: "date" });
+    const form = el("form", {
+      onSubmit: (e) => {
+        e.preventDefault();
+        if (!fullName.value.trim()) {
+          toast("\u0627\u0644\u0627\u0633\u0645 \u0645\u0637\u0644\u0648\u0628", "error");
+          return;
+        }
+        const data = {
+          fullName: fullName.value.trim(),
+          nationality: nationality.value.trim(),
+          iqamaNumber: iqamaNumber.value.trim(),
+          iqamaExpiry: iqamaExpiry.value,
+          phone: phone.value.trim(),
+          jobTitle: jobTitle.value.trim(),
+          contractStart: contractStart.value,
+          contractEnd: contractEnd.value
+        };
+        store.addPendingSubmission({
+          estId: payload.estId,
+          kind: "worker",
+          token,
+          payload: data,
+          submittedAt: (/* @__PURE__ */ new Date()).toISOString()
+        });
+        const code = btoa(unescape(encodeURIComponent(JSON.stringify({
+          estId: payload.estId,
+          kind: "worker",
+          payload: data,
+          submittedAt: (/* @__PURE__ */ new Date()).toISOString()
+        })))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+        card.replaceChildren(
+          el("h1", {}, "\u062A\u0645 \u0627\u0633\u062A\u0644\u0627\u0645 \u0628\u064A\u0627\u0646\u0627\u062A\u0643 \u2713"),
+          el("p", {}, "\u0634\u0643\u0631\u0627\u064B \u0644\u0643! \u0627\u0646\u0633\u062E \u0627\u0644\u0643\u0648\u062F \u0627\u0644\u062A\u0627\u0644\u064A \u0648\u0623\u0631\u0633\u0644\u0647 \u0644\u062C\u0647\u0629 \u0627\u0644\u0639\u0645\u0644 (\u0645\u062B\u0644\u0627\u064B \u0639\u0628\u0631 \u0648\u0627\u062A\u0633\u0627\u0628) \u0644\u062A\u062F\u0645\u062C \u0628\u064A\u0627\u0646\u0627\u062A\u0643 \u0641\u064A \u0627\u0644\u0646\u0638\u0627\u0645:"),
+          el("div", { class: "share-link" }, code),
+          el("div", { class: "form-actions" }, [
+            el("button", { class: "btn-secondary", onClick: async () => {
+              try {
+                await navigator.clipboard.writeText(code);
+                toast("\u062A\u0645 \u0646\u0633\u062E \u0627\u0644\u0643\u0648\u062F", "success");
+              } catch {
+                toast("\u062A\u0639\u0630\u0631 \u0627\u0644\u0646\u0633\u062E \u062A\u0644\u0642\u0627\u0626\u064A\u0627\u064B\u060C \u0627\u0646\u0633\u062E \u064A\u062F\u0648\u064A\u0627\u064B", "error");
+              }
+            } }, "\u0646\u0633\u062E \u0627\u0644\u0643\u0648\u062F")
+          ])
+        );
+        window.scrollTo(0, 0);
+      }
+    }, [
+      el("div", { class: "form-grid" }, [
+        field("\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0643\u0627\u0645\u0644", fullName),
+        field("\u0627\u0644\u062C\u0646\u0633\u064A\u0629", nationality),
+        field("\u0631\u0642\u0645 \u0627\u0644\u0625\u0642\u0627\u0645\u0629", iqamaNumber),
+        field("\u0627\u0646\u062A\u0647\u0627\u0621 \u0627\u0644\u0625\u0642\u0627\u0645\u0629", iqamaExpiry),
+        field("\u0627\u0644\u062C\u0648\u0627\u0644", phone),
+        field("\u0627\u0644\u0648\u0638\u064A\u0641\u0629", jobTitle),
+        field("\u0628\u062F\u0627\u064A\u0629 \u0627\u0644\u0639\u0642\u062F", contractStart),
+        field("\u0646\u0647\u0627\u064A\u0629 \u0627\u0644\u0639\u0642\u062F", contractEnd)
+      ]),
+      el("div", { class: "form-actions" }, [
+        el("button", { type: "submit", class: "btn" }, "\u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A")
+      ])
+    ]);
+    card.appendChild(form);
+  }
+
+  // hr-platform/app/views/public-hr.js
+  async function renderPublicHR(_ctx, app) {
+    const params = new URLSearchParams(location.hash.split("?")[1] || "");
+    const token = params.get("t") || "";
+    const payload = await verifyShareToken(token);
+    const card = el("div", { class: "card" }, []);
+    const wrap = el("div", { class: "public-page" }, [card]);
+    app.appendChild(wrap);
+    if (!payload || payload.kind !== "hr") {
+      card.appendChild(el("h1", {}, "\u0627\u0644\u0631\u0627\u0628\u0637 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D"));
+      card.appendChild(el("p", {}, "\u0627\u0644\u0631\u0627\u0628\u0637 \u0645\u0646\u062A\u0647\u064A \u0623\u0648 \u0645\u0644\u063A\u0649."));
+      return;
+    }
+    const est = store.state.establishments[payload.estId];
+    const rowsHost = el("div", {});
+    const rows = [];
+    function addRow(initial = {}) {
+      const r = {
+        fullName: input({ value: initial.fullName || "" }),
+        nationality: input({ value: initial.nationality || "" }),
+        iqamaNumber: input({ value: initial.iqamaNumber || "" }),
+        iqamaExpiry: input({ type: "date", value: initial.iqamaExpiry || "" }),
+        phone: input({ value: initial.phone || "", type: "tel" }),
+        jobTitle: input({ value: initial.jobTitle || "" })
+      };
+      const node = el("div", { class: "card", style: { marginTop: "10px" } }, [
+        el("div", { class: "form-grid" }, [
+          field("\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0643\u0627\u0645\u0644", r.fullName),
+          field("\u0627\u0644\u062C\u0646\u0633\u064A\u0629", r.nationality),
+          field("\u0631\u0642\u0645 \u0627\u0644\u0625\u0642\u0627\u0645\u0629", r.iqamaNumber),
+          field("\u0627\u0646\u062A\u0647\u0627\u0621 \u0627\u0644\u0625\u0642\u0627\u0645\u0629", r.iqamaExpiry),
+          field("\u0627\u0644\u062C\u0648\u0627\u0644", r.phone),
+          field("\u0627\u0644\u0648\u0638\u064A\u0641\u0629", r.jobTitle)
+        ]),
+        el("div", { class: "form-actions" }, [
+          el("button", { type: "button", class: "btn-danger btn-sm", onClick: () => {
+            rows.splice(rows.indexOf(entry), 1);
+            node.remove();
+          } }, "\u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0635\u0641")
+        ])
+      ]);
+      const entry = { node, fields: r };
+      rows.push(entry);
+      rowsHost.appendChild(node);
+    }
+    addRow();
+    card.appendChild(el("h1", {}, "\u0625\u062F\u062E\u0627\u0644 \u062F\u0641\u0639\u0629 \u0628\u064A\u0627\u0646\u0627\u062A"));
+    card.appendChild(el("p", {}, [
+      "\u0644\u0640 ",
+      el("strong", {}, est?.name || "\u062C\u0647\u0629 \u0627\u0644\u0639\u0645\u0644"),
+      ". \u064A\u0645\u0643\u0646\u0643 \u0625\u0636\u0627\u0641\u0629 \u0639\u062F\u0629 \u0639\u0645\u0627\u0644 \u0641\u064A \u0646\u0641\u0633 \u0627\u0644\u062C\u0644\u0633\u0629."
+    ]));
+    card.appendChild(rowsHost);
+    card.appendChild(el("div", { class: "form-actions between" }, [
+      el("button", { class: "btn-secondary", onClick: () => addRow() }, "+ \u0625\u0636\u0627\u0641\u0629 \u0635\u0641"),
+      el("button", { class: "btn", onClick: submit }, "\u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u062F\u0641\u0639\u0629")
+    ]));
+    function submit() {
+      const data = rows.map((r) => ({
+        fullName: r.fields.fullName.value.trim(),
+        nationality: r.fields.nationality.value.trim(),
+        iqamaNumber: r.fields.iqamaNumber.value.trim(),
+        iqamaExpiry: r.fields.iqamaExpiry.value,
+        phone: r.fields.phone.value.trim(),
+        jobTitle: r.fields.jobTitle.value.trim()
+      })).filter((d) => d.fullName);
+      if (!data.length) {
+        toast("\u0627\u0644\u0631\u062C\u0627\u0621 \u0625\u062F\u062E\u0627\u0644 \u0628\u064A\u0627\u0646\u0627\u062A \u0639\u0627\u0645\u0644 \u0648\u0627\u062D\u062F \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644", "error");
+        return;
+      }
+      store.addPendingSubmission({
+        estId: payload.estId,
+        kind: "hr-batch",
+        token,
+        payload: data,
+        submittedAt: (/* @__PURE__ */ new Date()).toISOString()
+      });
+      const code = btoa(unescape(encodeURIComponent(JSON.stringify({
+        estId: payload.estId,
+        kind: "hr-batch",
+        payload: data,
+        submittedAt: (/* @__PURE__ */ new Date()).toISOString()
+      })))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      card.replaceChildren(
+        el("h1", {}, "\u062A\u0645 \u0627\u0633\u062A\u0644\u0627\u0645 \u0627\u0644\u062F\u0641\u0639\u0629 \u2713"),
+        el("p", {}, `\u062A\u0645 \u062A\u0633\u062C\u064A\u0644 ${data.length} \u0639\u0627\u0645\u0644. \u0623\u0631\u0633\u0644 \u0627\u0644\u0643\u0648\u062F \u0627\u0644\u062A\u0627\u0644\u064A \u0644\u0645\u0633\u0624\u0648\u0644 \u0627\u0644\u0646\u0638\u0627\u0645 \u0644\u062F\u0645\u062C\u0647:`),
+        el("div", { class: "share-link" }, code),
+        el("div", { class: "form-actions" }, [
+          el("button", { class: "btn-secondary", onClick: async () => {
+            try {
+              await navigator.clipboard.writeText(code);
+              toast("\u062A\u0645 \u0646\u0633\u062E \u0627\u0644\u0643\u0648\u062F", "success");
+            } catch {
+              toast("\u062A\u0639\u0630\u0631 \u0627\u0644\u0646\u0633\u062E", "error");
+            }
+          } }, "\u0646\u0633\u062E \u0627\u0644\u0643\u0648\u062F")
+        ])
+      );
+      window.scrollTo(0, 0);
+    }
+  }
+
+  // hr-platform/app/main.js
+  var ROUTES = [
+    { pattern: "#/login", view: guardPublic(renderLogin), public: true },
+    { pattern: "#/register", view: guardPublic(renderRegister), public: true },
+    { pattern: "#/p/worker", view: shellPublic(renderPublicWorker), public: true },
+    { pattern: "#/p/hr", view: shellPublic(renderPublicHR), public: true },
+    { pattern: "#/", view: guardAuthed(renderDashboard, "\u0627\u0644\u0631\u0626\u064A\u0633\u064A\u0629", "dashboard") },
+    { pattern: "#/dashboard", view: guardAuthed(renderDashboard, "\u0627\u0644\u0631\u0626\u064A\u0633\u064A\u0629", "dashboard") },
+    { pattern: "#/branches", view: guardAuthed(renderBranches, "\u0627\u0644\u0641\u0631\u0648\u0639", "branches") },
+    { pattern: "#/branches/:id", view: guardAuthed(renderBranchDetail, "\u0627\u0644\u0641\u0631\u0648\u0639", "branches") },
+    { pattern: "#/registrations", view: guardAuthed(renderRegistrations, "\u0627\u0644\u0633\u062C\u0644\u0627\u062A", "registrations") },
+    { pattern: "#/registrations/:id", view: guardAuthed(renderRegistrationDetail, "\u0627\u0644\u0633\u062C\u0644\u0627\u062A", "registrations") },
+    { pattern: "#/licenses", view: guardAuthed(renderLicenses, "\u0627\u0644\u062A\u0631\u0627\u062E\u064A\u0635", "licenses") },
+    { pattern: "#/licenses/:id", view: guardAuthed(renderLicenseDetail, "\u0627\u0644\u062A\u0631\u0627\u062E\u064A\u0635", "licenses") },
+    { pattern: "#/employees", view: guardAuthed(renderEmployees, "\u0627\u0644\u0639\u0645\u0627\u0644\u0629", "employees") },
+    { pattern: "#/employees/:id", view: guardAuthed(renderEmployeeDetail, "\u0627\u0644\u0639\u0645\u0627\u0644\u0629", "employees") },
+    { pattern: "#/import", view: guardAuthed(renderImport, "\u0627\u0633\u062A\u064A\u0631\u0627\u062F Excel", "import") },
+    { pattern: "#/share", view: guardAuthed(renderShareLinks, "\u0627\u0644\u0631\u0648\u0627\u0628\u0637 \u0627\u0644\u062E\u0627\u0631\u062C\u064A\u0629", "share") },
+    { pattern: "#/notifications", view: guardAuthed(renderNotifications, "\u0633\u062C\u0644 \u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062A", "notifications") }
+  ];
+  function guardAuthed(viewFn, title, navKey) {
+    return (ctx) => {
+      if (!isAuthed()) {
+        navigate("#/login");
+        return;
+      }
+      ensureShell();
+      setPageTitle(title);
+      setActiveNav(navKey);
+      refreshUserChip();
+      viewFn(ctx);
+    };
+  }
+  function guardPublic(viewFn) {
+    return (ctx) => {
+      if (isAuthed()) {
+        navigate("#/dashboard");
+        return;
+      }
+      renderAuthShell(viewFn, ctx);
+    };
+  }
+  function shellPublic(viewFn) {
+    return (ctx) => renderPublicShell(viewFn, ctx);
+  }
+  function renderAuthShell(viewFn, ctx) {
+    const app = document.getElementById("app");
+    app.dataset.state = "auth";
+    clear(app);
+    viewFn(ctx, app);
+  }
+  function renderPublicShell(viewFn, ctx) {
+    const app = document.getElementById("app");
+    app.dataset.state = "public";
+    clear(app);
+    viewFn(ctx, app);
+  }
+  function ensureShell() {
+    const app = document.getElementById("app");
+    if (app.dataset.state !== "shell") {
+      app.dataset.state = "shell";
+      app.classList.remove("menu-open");
+      clear(app);
+      const tpl = document.getElementById("tpl-shell");
+      app.appendChild(tpl.content.cloneNode(true));
+      bindShell(app);
+    }
+  }
+  function bindShell(app) {
+    app.addEventListener("click", (e) => {
+      const action = e.target.closest("[data-action]")?.dataset.action;
+      if (action === "logout") {
+        logout();
+        toast("\u062A\u0645 \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062E\u0631\u0648\u062C");
+        navigate("#/login");
+      } else if (action === "toggle-sidebar") {
+        app.classList.toggle("menu-open");
+      } else if (e.target.closest(".nav a")) {
+        app.classList.remove("menu-open");
+      }
+    });
+  }
+  function setActiveNav(key) {
+    document.querySelectorAll(".nav a").forEach((a) => {
+      a.classList.toggle("active", a.dataset.nav === key);
+    });
+  }
+  function refreshUserChip() {
+    const est = store.currentEst();
+    const chip = document.querySelector("[data-user-chip]");
+    const sub = document.querySelector("[data-est-name]");
+    if (chip) chip.textContent = est ? est.ownerEmail : "\u2014";
+    if (sub) sub.textContent = est ? est.name : "\u2014";
+  }
+  defineRoutes(ROUTES);
+  store.subscribe(() => {
+    if (document.getElementById("app").dataset.state === "shell") refreshUserChip();
+  });
+  startRouter();
+  window.addEventListener("load", () => {
+    const h = currentHash();
+    if (h === "#/" || h === "" || h === "#") {
+      if (!isAuthed()) navigate("#/login");
+    }
+  });
+})();
+
+  </script>
+</body>
+</html>
