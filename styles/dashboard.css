@@ -1,0 +1,72 @@
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.kpi {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px;
+  display: flex; align-items: center; gap: 12px;
+  box-shadow: var(--shadow-sm);
+}
+.kpi-icon {
+  width: 44px; height: 44px; border-radius: 10px;
+  display: grid; place-items: center;
+  background: var(--surface-2); color: var(--primary-600);
+  font-size: 22px;
+}
+.kpi-value { font-size: 22px; font-weight: 800; }
+.kpi-label { color: var(--muted); font-size: 13px; }
+
+.alert-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.alert-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+  display: flex; flex-direction: column;
+  box-shadow: var(--shadow-sm);
+}
+.alert-card-head {
+  padding: 14px 16px;
+  display: flex; justify-content: space-between; align-items: center;
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
+}
+.alert-card-head .count { font-size: 22px; }
+.alert-card.expired .alert-card-head { background: #fee2e2; color: #b91c1c; }
+.alert-card.urgent  .alert-card-head { background: #ffedd5; color: #c2410c; }
+.alert-card.soon    .alert-card-head { background: #fef3c7; color: #92400e; }
+.alert-card.ok      .alert-card-head { background: #dcfce7; color: #15803d; }
+
+.alert-list { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto; }
+.alert-list li {
+  padding: 10px 16px; border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; font-size: 13px;
+}
+.alert-list li:last-child { border-bottom: 0; }
+.alert-list .item-meta { color: var(--muted); font-size: 12px; }
+.alert-card-foot {
+  padding: 10px 16px; border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; gap: 8px;
+}
+
+.dash-row {
+  display: grid; grid-template-columns: 2fr 1fr;
+  gap: 16px; margin-top: 22px;
+}
+@media (max-width: 900px) {
+  .dash-row { grid-template-columns: 1fr; }
+}
+
+.activity-list { list-style: none; margin: 0; padding: 0; max-height: 360px; overflow-y: auto; }
+.activity-list li {
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.activity-list li:last-child { border-bottom: 0; }
+.activity-list .ts { color: var(--muted); font-size: 11px; }
