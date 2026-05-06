@@ -2,8 +2,16 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#000000">
+    android:background="#050507">
 
+    <!-- Hardware-accelerated camera preview (back layer) -->
+    <com.dlvr.app.AspectRatioTextureView
+        android:id="@+id/cameraTexture"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center" />
+
+    <!-- WebView UI (front layer, transparent over camera) -->
     <WebView
         android:id="@+id/webView"
         android:layout_width="match_parent"
