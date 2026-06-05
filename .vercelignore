@@ -1,0 +1,8 @@
+# Android app — not part of the web deployment
+DlvrApp/
+
+# Build artifacts
+*.apk
+*.aab
+*.keystore
+*.jks
