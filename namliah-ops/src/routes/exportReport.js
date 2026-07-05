@@ -2,7 +2,7 @@
 const express = require('express');
 const { requireAuth } = require('../auth');
 const reports = require('../services/reports');
-const { db, getSetting } = require('../db');
+const { db, getSetting, BRANCHES, DEFAULT_BRANCH } = require('../db');
 
 const router = express.Router();
 
@@ -76,15 +76,19 @@ function linesTable(title, rows, headColor) {
 router.get('/:date/print', requireAuth, (req, res) => {
   const { date } = req.params;
   if (!reports.DATE_RE.test(date)) return res.status(400).send('تاريخ غير صحيح');
+  // مدير التشغيل يطبع تقرير فرعه؛ الإدارة تحدد ?branch=
+  const branch = req.session.role === 'ops'
+    ? (req.session.branch || DEFAULT_BRANCH)
+    : (BRANCHES[req.query.branch] ? req.query.branch : DEFAULT_BRANCH);
   const approvedOnly = req.session.role === 'admin';
-  const report = reports.getReportByDate(date, { approvedOnly });
+  const report = reports.getReportByDate(branch, date, { approvedOnly });
   if (!report) return res.status(404).send('لا يوجد تقرير لهذا اليوم');
 
   const latestReviews = db.prepare(`
     SELECT author_name, rating, text, review_date, sentiment FROM reviews
-    ORDER BY review_date DESC LIMIT 4
-  `).all();
-  const reviewStats = db.prepare('SELECT COUNT(*) AS count, AVG(rating) AS avg FROM reviews').get();
+    WHERE branch = ? ORDER BY review_date DESC LIMIT 4
+  `).all(branch);
+  const reviewStats = db.prepare('SELECT COUNT(*) AS count, AVG(rating) AS avg FROM reviews WHERE branch = ?').get(branch);
 
   // مبيعات الصالة حسب الويتر
   const hall = [...(report.hall_sales || [])].sort((a, b) => b.total - a.total);
@@ -93,17 +97,20 @@ router.get('/:date/print', requireAuth, (req, res) => {
     <tr><td>${esc(w.waiter)}</td><td class="num">${money(w.total)}</td>
     <td class="num">${hallTotal ? fmt.format((w.total / hallTotal) * 100) : 0}%</td></tr>`).join('');
 
-  const tablesCount = Number(getSetting('tables_count')) || null;
+  const tablesCount = Number(getSetting(`tables_count:${branch}`)) || null;
   const tableAvg = tablesCount && hallTotal > 0 ? hallTotal / tablesCount : null;
 
   const d = report.deductions || {};
+  const dn = report.deduction_notes || {};
   const deductionsLine = [
-    ['كوبونات', d.coupons], ['خصومات', d.discounts], ['إلغاءات', d.cancellations]
-  ].map(([l, v]) => `${l}: <b>${money(v || 0)}</b>`).join(' · ');
+    ['كوبونات', d.coupons, dn.coupons], ['خصومات', d.discounts, dn.discounts], ['إلغاءات', d.cancellations, dn.cancellations]
+  ].map(([l, v, note]) =>
+    `${l}: <b>${money(v || 0)}</b>${note ? ` <span class="ded-note">(${esc(note)})</span>` : ''}`
+  ).join(' · ');
 
   const lines = report.lines || [];
   const topLines = lines.slice(0, 10);
-  const bottomLines = lines.length > 10 ? lines.slice(-5).reverse() : [];
+  const bottomLines = lines.length > 10 ? lines.slice(-10).reverse() : [];
 
   const notesByCat = {};
   (report.notes || []).forEach((n) => { notesByCat[n.category] = n; });
@@ -160,6 +167,7 @@ router.get('/:date/print', requireAuth, (req, res) => {
   .kpi .val{font-size:19px;font-weight:800;color:var(--bottle);font-variant-numeric:tabular-nums}
   .deductions{background:var(--bone);border:1px dashed var(--brass);border-radius:10px;padding:7px 14px;margin-top:10px;font-size:12.5px;color:var(--ink-soft)}
   .deductions b{color:var(--ink);font-variant-numeric:tabular-nums}
+  .ded-note{color:var(--brass-deep);font-size:11.5px}
   .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   .mix-row{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed var(--line-soft)}
   .mix-row .pct{min-width:44px;text-align:left;direction:ltr}
@@ -196,7 +204,7 @@ router.get('/:date/print', requireAuth, (req, res) => {
   <header>
     <div>
       <img src="/img/logo-cream.png" alt="نملية — مطعم من الريف اللبناني">
-      <div class="sub">التقرير التشغيلي اليومي · فرع جدة</div>
+      <div class="sub">التقرير التشغيلي اليومي · فرع ${esc(report.branch_name)}</div>
     </div>
     <div class="date">${esc(date)}</div>
   </header>
@@ -231,7 +239,7 @@ router.get('/:date/print', requireAuth, (req, res) => {
     <h2>تفاصيل المبيعات <small>${fmt.format(lines.length)} صنف إجمالاً</small></h2>
     <div class="cols">
       <div>${linesTable('الأكثر مبيعاً — ١٠ أصناف', topLines, 'var(--bottle-deep)')}</div>
-      <div>${linesTable('الأقل مبيعاً — ٥ أصناف', bottomLines, 'var(--terracotta)')}</div>
+      <div>${linesTable('الأقل مبيعاً — ١٠ أصناف', bottomLines, 'var(--terracotta)')}</div>
     </div>
 
     <h2>الملاحظات اليومية</h2>

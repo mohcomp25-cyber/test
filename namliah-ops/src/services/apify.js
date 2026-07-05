@@ -1,12 +1,25 @@
 'use strict';
-const { db, getSetting, setSetting, audit } = require('./../db');
+const { db, getSetting, setSetting, audit, BRANCHES, DEFAULT_BRANCH } = require('./../db');
 
 const APIFY_BASE = 'https://api.apify.com/v2';
 const POLL_INTERVAL_MS = 10 * 1000;
 const RUN_TIMEOUT_MS = 8 * 60 * 1000;
 
-function isConfigured() {
-  return Boolean(process.env.APIFY_TOKEN && process.env.GOOGLE_MAPS_URL);
+// رابط قوقل ماب لكل فرع: GOOGLE_MAPS_URL_JEDDAH / _ABHA / _MAKKAH
+// (GOOGLE_MAPS_URL القديم يُعامل كرابط جدة للتوافق)
+function mapsUrlFor(branch) {
+  const url = process.env[`GOOGLE_MAPS_URL_${branch.toUpperCase()}`];
+  if (url) return url;
+  if (branch === DEFAULT_BRANCH) return process.env.GOOGLE_MAPS_URL || null;
+  return null;
+}
+
+function isConfigured(branch = DEFAULT_BRANCH) {
+  return Boolean(process.env.APIFY_TOKEN && mapsUrlFor(branch));
+}
+
+function configuredBranches() {
+  return Object.keys(BRANCHES).filter((b) => isConfigured(b));
 }
 
 function sentimentFor(rating) {
@@ -30,9 +43,9 @@ async function apifyFetch(pathname, options) {
   return res.json();
 }
 
-async function startRun() {
+async function startRun(branch) {
   const input = {
-    startUrls: [{ url: process.env.GOOGLE_MAPS_URL }],
+    startUrls: [{ url: mapsUrlFor(branch) }],
     maxReviews: Number(process.env.APIFY_MAX_REVIEWS || 200),
     reviewsSort: 'newest',
     language: 'ar',
@@ -65,9 +78,10 @@ async function fetchDataset(datasetId) {
 }
 
 const upsertReview = db.prepare(`
-  INSERT INTO reviews (external_id, author_name, author_photo_url, rating, text, review_date, photos, owner_reply, sentiment, fetched_at, is_demo)
-  VALUES (@external_id, @author_name, @author_photo_url, @rating, @text, @review_date, @photos, @owner_reply, @sentiment, datetime('now'), 0)
+  INSERT INTO reviews (external_id, branch, author_name, author_photo_url, rating, text, review_date, photos, owner_reply, sentiment, fetched_at, is_demo)
+  VALUES (@external_id, @branch, @author_name, @author_photo_url, @rating, @text, @review_date, @photos, @owner_reply, @sentiment, datetime('now'), 0)
   ON CONFLICT(external_id) DO UPDATE SET
+    branch = excluded.branch,
     rating = excluded.rating,
     text = excluded.text,
     photos = excluded.photos,
@@ -76,7 +90,7 @@ const upsertReview = db.prepare(`
     fetched_at = excluded.fetched_at
 `);
 
-function mapItem(item) {
+function mapItem(branch, item) {
   const rating = Math.max(1, Math.min(5, Math.round(Number(item.stars ?? item.rating ?? 0)) || 0));
   if (!rating) return null;
   const externalId = item.reviewId || item.id;
@@ -85,6 +99,7 @@ function mapItem(item) {
     : Array.isArray(item.images) ? item.images : [];
   return {
     external_id: String(externalId),
+    branch,
     author_name: item.name || item.reviewerName || null,
     author_photo_url: item.reviewerPhotoUrl || item.userPhotoUrl || null,
     rating,
@@ -105,33 +120,33 @@ const saveAllTx = db.transaction((rows) => {
   return saved;
 });
 
-async function syncReviews(triggeredBy) {
-  if (!isConfigured()) {
-    setSetting('last_reviews_sync_status', 'not_configured');
-    return { status: 'not_configured' };
+async function syncReviews(branch, triggeredBy) {
+  if (!isConfigured(branch)) {
+    setSetting(`last_reviews_sync_status:${branch}`, 'not_configured');
+    return { status: 'not_configured', branch };
   }
-  if (getSetting('reviews_sync_running') === '1') {
-    return { status: 'already_running' };
+  if (getSetting(`reviews_sync_running:${branch}`) === '1') {
+    return { status: 'already_running', branch };
   }
-  setSetting('reviews_sync_running', '1');
+  setSetting(`reviews_sync_running:${branch}`, '1');
   try {
-    const run = await startRun();
+    const run = await startRun(branch);
     const finished = await waitForRun(run.id);
     const items = await fetchDataset(finished.defaultDatasetId);
-    const rows = (Array.isArray(items) ? items : []).map(mapItem).filter(Boolean);
+    const rows = (Array.isArray(items) ? items : []).map((it) => mapItem(branch, it)).filter(Boolean);
     const saved = saveAllTx(rows);
-    setSetting('last_reviews_sync_at', new Date().toISOString());
-    setSetting('last_reviews_sync_status', 'ok');
-    audit('reviews_synced', triggeredBy || null, { fetched: rows.length, saved });
-    return { status: 'ok', saved };
+    setSetting(`last_reviews_sync_at:${branch}`, new Date().toISOString());
+    setSetting(`last_reviews_sync_status:${branch}`, 'ok');
+    audit('reviews_synced', triggeredBy || null, { branch, fetched: rows.length, saved });
+    return { status: 'ok', branch, saved };
   } catch (err) {
-    setSetting('last_reviews_sync_at', new Date().toISOString());
-    setSetting('last_reviews_sync_status', `error: ${err.message}`);
-    audit('reviews_sync_failed', triggeredBy || null, { error: err.message });
-    return { status: 'error', message: err.message };
+    setSetting(`last_reviews_sync_at:${branch}`, new Date().toISOString());
+    setSetting(`last_reviews_sync_status:${branch}`, `error: ${err.message}`);
+    audit('reviews_sync_failed', triggeredBy || null, { branch, error: err.message });
+    return { status: 'error', branch, message: err.message };
   } finally {
-    setSetting('reviews_sync_running', '0');
+    setSetting(`reviews_sync_running:${branch}`, '0');
   }
 }
 
-module.exports = { isConfigured, syncReviews, sentimentFor };
+module.exports = { isConfigured, configuredBranches, syncReviews, sentimentFor };

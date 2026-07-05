@@ -131,6 +131,8 @@ async function initTopbar() {
   const user = await api('/api/auth/me');
   const el = document.getElementById('userName');
   if (el) el.textContent = user.displayName;
+  const badge = document.getElementById('branchBadge');
+  if (badge && user.branchName) badge.textContent = `فرع ${user.branchName}`;
   const btn = document.getElementById('logoutBtn');
   if (btn) btn.addEventListener('click', async () => {
     await api('/api/auth/logout', { method: 'POST' });

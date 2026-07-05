@@ -213,6 +213,103 @@ body {
 }
 .kpi-breakdown b { color: var(--nm-ink); font-variant-numeric: tabular-nums; }
 
+/* ---------- hero sales card + deduction notes ---------- */
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(340px, 1.2fr) 2fr;
+  gap: var(--sp-3);
+  align-items: stretch;
+}
+.kpi-grid--side { grid-template-columns: repeat(2, 1fr); }
+.kpi-card--hero {
+  padding: var(--sp-5) var(--sp-6);
+  background: linear-gradient(150deg, var(--nm-paper) 55%, var(--nm-bone));
+  border-color: rgba(184, 146, 83, 0.4);
+  box-shadow: var(--nm-elev-2);
+}
+.kpi-value--hero { font-size: 40px; line-height: 1.25; }
+.ded-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid var(--nm-line-soft);
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
+}
+.ded-row {
+  display: grid;
+  grid-template-columns: 62px 92px 1fr;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: 13px;
+}
+.ded-name { color: var(--nm-ink-soft); font-weight: 700; }
+.ded-amount {
+  color: var(--nm-bottle);
+  font-variant-numeric: tabular-nums;
+  direction: ltr;
+  text-align: left;
+  white-space: nowrap;
+}
+.ded-note-input { padding: 4px 10px; font-size: 12.5px; background: #fff; }
+.ded-note-input:disabled { background: var(--nm-bone); color: var(--nm-ink-soft); }
+
+/* ---------- توزيع المبيعات: صالة عريضة + استلام صغيرة ---------- */
+.dist-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--sp-3);
+  align-items: start;
+}
+.pickup-card { display: flex; flex-direction: column; gap: 2px; }
+.pickup-card .kpi-value { font-size: 30px; }
+
+/* ---------- branch badge ---------- */
+.branch-badge {
+  background: linear-gradient(180deg, var(--nm-brass), var(--nm-brass-deep));
+  color: var(--nm-paper);
+  font-size: 13px;
+  font-weight: 800;
+  border-radius: var(--r-pill);
+  padding: 3px 16px;
+  box-shadow: var(--nm-rim-brass);
+  white-space: nowrap;
+}
+.branch-badge:empty { display: none; }
+
+/* ---------- note cards (الملاحظات الفخمة) ---------- */
+.section-title--big { font-size: 24px; }
+.note-card {
+  background: var(--nm-paper);
+  border: 1px solid var(--nm-line-soft);
+  border-radius: var(--r-lg);
+  box-shadow: var(--nm-elev-2);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.note-card__head {
+  padding: 10px 16px;
+  color: var(--nm-parchment);
+  font-family: var(--nm-font-ar-display);
+  font-size: 16.5px;
+  font-weight: 700;
+  background: var(--nm-bottle);
+}
+.note-card--customers .note-card__head { background: linear-gradient(160deg, #4d6420, var(--chart-1)); }
+.note-card--operations .note-card__head { background: linear-gradient(160deg, var(--nm-bottle-deep), var(--nm-bottle-tint)); }
+.note-card--kitchen .note-card__head { background: linear-gradient(160deg, #8f4820, var(--chart-5)); }
+.note-card--maintenance .note-card__head { background: linear-gradient(160deg, #7a5408, var(--chart-3)); }
+.note-card--general .note-card__head { background: linear-gradient(160deg, #7e3a49, var(--chart-2)); }
+.note-card__body {
+  border: 0;
+  border-radius: 0;
+  min-height: 132px;
+  flex: 1;
+  background: var(--nm-paper);
+}
+.note-card__body:focus { box-shadow: inset 0 0 0 2px rgba(184, 146, 83, 0.35); }
+
 /* ---------- badges ---------- */
 .badge {
   display: inline-flex;
@@ -575,12 +672,19 @@ label.field-label { font-size: 12.5px; font-weight: 700; color: var(--nm-ink-sof
 .login-error.show { display: block; }
 
 /* ---------- الجوال ---------- */
+@media (max-width: 960px) {
+  .hero-grid { grid-template-columns: 1fr; }
+  .dist-grid { grid-template-columns: 1fr; }
+}
 @media (max-width: 720px) {
   body { font-size: 14px; }
   .topbar { min-height: 54px; gap: var(--sp-2); }
   .topbar .brand-logo { height: 32px; }
   .topbar .page-title { display: none; }
   .topbar .user { display: none; }
+  .branch-badge { font-size: 11.5px; padding: 2px 12px; }
+  .kpi-value--hero { font-size: 30px; }
+  .ded-row { grid-template-columns: 58px 84px 1fr; font-size: 12px; }
   .container { gap: var(--sp-4); }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .kpi-value { font-size: 20px; }

@@ -24,8 +24,11 @@ async function loadTables() {
   if (tablesCount) document.getElementById('tablesCount').value = tablesCount;
 }
 
+const DED_KEYS = ['coupons', 'discounts', 'cancellations'];
+
 function setLocked(locked) {
   NOTE_CATS.forEach((c) => { document.getElementById(`note-${c}`).disabled = locked; });
+  DED_KEYS.forEach((k) => { document.getElementById(`dedNote-${k}`).disabled = locked; });
   document.getElementById('saveNoteBtn').disabled = locked;
   const approveBtn = document.getElementById('approveBtn');
   approveBtn.disabled = locked;
@@ -64,11 +67,17 @@ function renderWaiters(hallSales) {
   foot.innerHTML = `<tr><td>إجمالي الصالة</td><td class="num">${money(total)}</td><td class="num">100%</td></tr>`;
 }
 
-function renderExternal(mix) {
-  renderMixList(document.getElementById('externalMix'), mix);
-  const total = Object.values(flattenMix(mix)).reduce((a, v) => a + v, 0);
-  document.getElementById('externalTotal').innerHTML = total
-    ? `<span>إجمالي الطلبات الخارجية</span><span class="num">${money(total)}</span>` : '';
+// بطاقة الاستلام المصغّرة: رقم الاستلام كبير + أي مفاتيح أخرى (إن وردت) كصفوف صغيرة
+function renderExternal(mix, reportTotal) {
+  const flat = flattenMix(mix);
+  const pickup = flat.takeaway || 0;
+  const total = Object.values(flat).reduce((a, v) => a + v, 0);
+  document.getElementById('pickupTotal').textContent = money(pickup);
+  document.getElementById('pickupShare').textContent = reportTotal
+    ? `${nf.format((total / reportTotal) * 100)}٪ من إجمالي المبيعات` : '';
+  const extra = Object.entries(flat).filter(([k]) => k !== 'takeaway').sort((a, b) => b[1] - a[1]);
+  document.getElementById('externalExtra').innerHTML = extra.map(([k, v]) => `
+    <div class="mix-row"><span class="mix-name">${esc(mixLabel(k))}</span><span class="mix-val">${money(v)}</span></div>`).join('');
 }
 
 function linesRow(l, i) {
@@ -103,17 +112,18 @@ async function loadReport(date) {
   // المؤشرات
   document.getElementById('kpiSales').textContent = money(report.total_sales);
   const d = report.deductions || {};
-  const dedParts = [
-    ['كوبونات', d.coupons], ['خصومات', d.discounts], ['إلغاءات', d.cancellations]
-  ].map(([label, v]) => `<span>${label}: <b>${money(v || 0)}</b></span>`);
-  document.getElementById('kpiDeductions').innerHTML = dedParts.join('');
+  const dn = report.deduction_notes || {};
+  document.getElementById('dedCoupons').textContent = money(d.coupons || 0);
+  document.getElementById('dedDiscounts').textContent = money(d.discounts || 0);
+  document.getElementById('dedCancellations').textContent = money(d.cancellations || 0);
+  DED_KEYS.forEach((k) => { document.getElementById(`dedNote-${k}`).value = dn[k] || ''; });
   document.getElementById('kpiOrders').textContent = nf0.format(report.orders_count);
   document.getElementById('kpiAvg').textContent = money(report.avg_ticket);
 
   // طرق الدفع المصغّرة + توزيع المبيعات
   renderChips(document.getElementById('paymentChips'), report.payment_breakdown);
   renderWaiters(report.hall_sales || []);
-  renderExternal(report.external_sales || {});
+  renderExternal(report.external_sales || {}, report.total_sales);
   renderTableAvg();
 
   // الأكثر والأقل مبيعاً (السطور تصل مرتبة تنازلياً بالإجمالي)
@@ -122,7 +132,7 @@ async function loadReport(date) {
   document.getElementById('topLinesBody').innerHTML =
     lines.slice(0, 10).map(linesRow).join('') ||
     '<tr><td colspan="4" class="muted" style="text-align:center;padding:14px">لا توجد تفاصيل</td></tr>';
-  const bottom = lines.length > 10 ? lines.slice(-5).reverse() : [];
+  const bottom = lines.length > 10 ? lines.slice(-10).reverse() : [];
   document.getElementById('bottomLinesBody').innerHTML =
     bottom.map(linesRow).join('') ||
     '<tr><td colspan="4" class="muted" style="text-align:center;padding:14px">—</td></tr>';
@@ -140,6 +150,12 @@ function collectNotes() {
   const notes = {};
   NOTE_CATS.forEach((c) => { notes[c] = document.getElementById(`note-${c}`).value; });
   return notes;
+}
+
+function collectDeductionNotes() {
+  const out = {};
+  DED_KEYS.forEach((k) => { out[k] = document.getElementById(`dedNote-${k}`).value; });
+  return out;
 }
 
 async function loadReviews() {
@@ -204,7 +220,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('saveNoteBtn').addEventListener('click', async () => {
     try {
-      await api(`/api/ops/report/${currentDate}/notes`, { method: 'PUT', body: { notes: collectNotes() } });
+      await api(`/api/ops/report/${currentDate}/notes`, { method: 'PUT', body: { notes: collectNotes(), deduction_notes: collectDeductionNotes() } });
       toast('تم حفظ الملاحظات');
     } catch (err) { toast(err.message, true); }
   });
@@ -213,7 +229,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (currentStatus === 'approved') return;
     if (!confirm(`اعتماد تقرير يوم ${currentDate} ونشره للإدارة؟\nلا يمكن التعديل عليه بعد الاعتماد.`)) return;
     try {
-      await api(`/api/ops/report/${currentDate}/notes`, { method: 'PUT', body: { notes: collectNotes() } }).catch(() => {});
+      await api(`/api/ops/report/${currentDate}/notes`, { method: 'PUT', body: { notes: collectNotes(), deduction_notes: collectDeductionNotes() } }).catch(() => {});
       const res = await api(`/api/ops/report/${currentDate}/approve`, { method: 'POST' });
       toast(res.message || 'تم الاعتماد');
       await loadDates();

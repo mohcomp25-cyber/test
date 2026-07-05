@@ -11,6 +11,7 @@
 <body>
 <header class="topbar">
   <img class="brand-logo" src="/img/logo-cream.png" alt="نملية — مطعم من الريف اللبناني">
+  <span class="branch-badge" id="branchBadge"></span>
   <div class="page-title">لوحة مدير التشغيل · التقرير اليومي</div>
   <div class="spacer"></div>
   <span class="user" id="userName"></span>
@@ -33,17 +34,35 @@
   </div>
 
   <div id="reportArea" style="display:none;flex-direction:column;gap:20px">
-    <!-- المؤشرات -->
-    <section class="kpi-grid">
-      <div class="kpi-card" style="grid-column:span 2">
+    <!-- المؤشرات: بطاقة المبيعات الكبيرة + بقية المؤشرات -->
+    <section class="hero-grid">
+      <div class="kpi-card kpi-card--hero">
         <div class="kpi-label">إجمالي المبيعات</div>
-        <div class="kpi-value" id="kpiSales"></div>
-        <div class="kpi-breakdown" id="kpiDeductions"></div>
+        <div class="kpi-value kpi-value--hero" id="kpiSales"></div>
+        <div class="ded-list" id="dedList">
+          <div class="ded-row">
+            <span class="ded-name">كوبونات</span>
+            <b class="ded-amount" id="dedCoupons"></b>
+            <input class="input ded-note-input" id="dedNote-coupons" data-ded="coupons" placeholder="مثال: ٣ بلوقر">
+          </div>
+          <div class="ded-row">
+            <span class="ded-name">خصومات</span>
+            <b class="ded-amount" id="dedDiscounts"></b>
+            <input class="input ded-note-input" id="dedNote-discounts" data-ded="discounts" placeholder="مثال: خصم للمالك">
+          </div>
+          <div class="ded-row">
+            <span class="ded-name">إلغاءات</span>
+            <b class="ded-amount" id="dedCancellations"></b>
+            <input class="input ded-note-input" id="dedNote-cancellations" data-ded="cancellations" placeholder="مثال: إرجاع طلب فيه مشكلة">
+          </div>
+        </div>
       </div>
-      <div class="kpi-card"><div class="kpi-label">عدد الطلبات</div><div class="kpi-value" id="kpiOrders"></div></div>
-      <div class="kpi-card"><div class="kpi-label">متوسط الفاتورة</div><div class="kpi-value" id="kpiAvg"></div></div>
-      <div class="kpi-card"><div class="kpi-label">متوسط مبيعات الطاولة</div><div class="kpi-value" id="kpiTableAvg"></div><div class="kpi-sub" id="kpiTableSub"></div></div>
-      <div class="kpi-card"><div class="kpi-label">تقييم قوقل ماب</div><div class="kpi-value" id="kpiRating"><small>—</small></div><div class="kpi-sub" id="kpiRatingSub"></div></div>
+      <div class="kpi-grid kpi-grid--side">
+        <div class="kpi-card"><div class="kpi-label">عدد الطلبات</div><div class="kpi-value" id="kpiOrders"></div></div>
+        <div class="kpi-card"><div class="kpi-label">متوسط الفاتورة</div><div class="kpi-value" id="kpiAvg"></div></div>
+        <div class="kpi-card"><div class="kpi-label">متوسط مبيعات الطاولة</div><div class="kpi-value" id="kpiTableAvg"></div><div class="kpi-sub" id="kpiTableSub"></div></div>
+        <div class="kpi-card"><div class="kpi-label">تقييم قوقل ماب</div><div class="kpi-value" id="kpiRating"><small>—</small></div><div class="kpi-sub" id="kpiRatingSub"></div></div>
+      </div>
     </section>
 
     <!-- طرق الدفع — بطاقة مصغّرة -->
@@ -52,10 +71,10 @@
       <div class="chips-row" id="paymentChips" style="flex:1"></div>
     </section>
 
-    <!-- توزيع المبيعات -->
+    <!-- توزيع المبيعات: الصالة عريضة + بطاقة استلام صغيرة ملاصقة -->
     <section>
       <h2 class="section-title" style="margin-bottom:12px">توزيع المبيعات</h2>
-      <div class="charts-grid">
+      <div class="dist-grid">
         <div class="card">
           <h3 class="section-title" style="font-size:16px;margin-bottom:10px">مبيعات الصالة <small>حسب الويتر</small></h3>
           <div class="table-wrap" style="border:0">
@@ -66,10 +85,12 @@
             </table>
           </div>
         </div>
-        <div class="card">
-          <h3 class="section-title" style="font-size:16px;margin-bottom:10px">الطلبات الخارجية <small>تطبيقات واستلام</small></h3>
-          <div class="mix-list" id="externalMix"></div>
-          <div class="mix-total" id="externalTotal"></div>
+        <div class="card pickup-card">
+          <h3 class="section-title" style="font-size:16px;margin-bottom:6px">الطلبات الخارجية</h3>
+          <div class="kpi-label">استلام</div>
+          <div class="kpi-value" id="pickupTotal">—</div>
+          <div class="kpi-sub" id="pickupShare"></div>
+          <div class="mix-list" id="externalExtra" style="margin-top:8px"></div>
         </div>
       </div>
     </section>
@@ -90,7 +111,7 @@
         <div class="card" style="padding:0;overflow:hidden">
           <div class="table-wrap" style="border:0">
             <table class="data-table">
-              <thead><tr><th colspan="4" style="text-align:center;background:var(--nm-terracotta)">الأقل مبيعاً — ٥ أصناف</th></tr>
+              <thead><tr><th colspan="4" style="text-align:center;background:var(--nm-terracotta)">الأقل مبيعاً — ١٠ أصناف</th></tr>
               <tr><th>#</th><th>الصنف</th><th>الكمية</th><th>الإجمالي</th></tr></thead>
               <tbody id="bottomLinesBody"></tbody>
             </table>
@@ -100,32 +121,32 @@
     </section>
 
     <!-- الملاحظات المصنفة -->
-    <section class="card">
-      <h2 class="section-title" style="margin-bottom:14px">الملاحظات اليومية</h2>
+    <section>
+      <h2 class="section-title section-title--big" style="margin-bottom:14px">الملاحظات اليومية</h2>
       <div class="notes-grid">
-        <div class="note-field">
-          <label class="field-label" for="note-customers">ملاحظات الزبائن وحلولها</label>
-          <textarea class="input" id="note-customers" data-cat="customers" placeholder="شكاوى أو طلبات الزبائن وكيف عولجت…"></textarea>
+        <div class="note-card note-card--customers">
+          <div class="note-card__head"><label for="note-customers">ملاحظات الزبائن وحلولها</label></div>
+          <textarea class="input note-card__body" id="note-customers" data-cat="customers" placeholder="شكاوى أو طلبات الزبائن وكيف عولجت…"></textarea>
         </div>
-        <div class="note-field">
-          <label class="field-label" for="note-operations">ملاحظات تشغيلية</label>
-          <textarea class="input" id="note-operations" data-cat="operations" placeholder="سير الوردية، الموظفون، الضغط…"></textarea>
+        <div class="note-card note-card--operations">
+          <div class="note-card__head"><label for="note-operations">ملاحظات تشغيلية</label></div>
+          <textarea class="input note-card__body" id="note-operations" data-cat="operations" placeholder="سير الوردية، الموظفون، الضغط…"></textarea>
         </div>
-        <div class="note-field">
-          <label class="field-label" for="note-kitchen">ملاحظات المطبخ</label>
-          <textarea class="input" id="note-kitchen" data-cat="kitchen" placeholder="الموردون، الجودة، التجهيز…"></textarea>
+        <div class="note-card note-card--kitchen">
+          <div class="note-card__head"><label for="note-kitchen">ملاحظات المطبخ</label></div>
+          <textarea class="input note-card__body" id="note-kitchen" data-cat="kitchen" placeholder="الموردون، الجودة، التجهيز…"></textarea>
         </div>
-        <div class="note-field">
-          <label class="field-label" for="note-maintenance">ملاحظات الصيانة</label>
-          <textarea class="input" id="note-maintenance" data-cat="maintenance" placeholder="أعطال، صيانة دورية، معدات…"></textarea>
+        <div class="note-card note-card--maintenance">
+          <div class="note-card__head"><label for="note-maintenance">ملاحظات الصيانة</label></div>
+          <textarea class="input note-card__body" id="note-maintenance" data-cat="maintenance" placeholder="أعطال، صيانة دورية، معدات…"></textarea>
         </div>
-        <div class="note-field" style="grid-column:1/-1">
-          <label class="field-label" for="note-general">ملاحظات عامة</label>
-          <textarea class="input" id="note-general" data-cat="general" placeholder="أي ملاحظات أخرى…"></textarea>
+        <div class="note-card note-card--general" style="grid-column:1/-1">
+          <div class="note-card__head"><label for="note-general">ملاحظات عامة</label></div>
+          <textarea class="input note-card__body" id="note-general" data-cat="general" placeholder="أي ملاحظات أخرى…"></textarea>
         </div>
       </div>
       <div style="display:flex;justify-content:flex-end;margin-top:12px">
-        <button class="btn btn--bottle btn--sm" id="saveNoteBtn">حفظ الملاحظات</button>
+        <button class="btn btn--bottle" id="saveNoteBtn">حفظ الملاحظات</button>
       </div>
     </section>
 

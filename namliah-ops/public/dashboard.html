@@ -20,6 +20,14 @@
 <main class="container">
   <!-- الفلاتر -->
   <div class="card filters">
+    <span class="field-label" style="margin:0">الفرع:</span>
+    <span id="branchChips" style="display:inline-flex;gap:8px;flex-wrap:wrap">
+      <button class="filter-chip active" data-branch="all">كل الفروع</button>
+      <button class="filter-chip" data-branch="jeddah">جدة</button>
+      <button class="filter-chip" data-branch="abha">أبها</button>
+      <button class="filter-chip" data-branch="makkah">مكة</button>
+    </span>
+    <span style="width:1px;align-self:stretch;background:var(--nm-line-soft)"></span>
     <span class="field-label" style="margin:0">المدى الزمني:</span>
     <button class="filter-chip" data-days="7">آخر ٧ أيام</button>
     <button class="filter-chip active" data-days="30">آخر ٣٠ يوم</button>

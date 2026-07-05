@@ -6,14 +6,15 @@ const { db } = require('../src/db');
 const { hashPassword } = require('../src/auth');
 
 // ---- users ----
+// جدة هي الفرع المفعّل حالياً — أبها ومكة يضافان عند الافتتاح عبر scripts/add-user.js
 const USERS = [
-  { username: 'ops', display_name: 'مدير التشغيل', role: 'ops', password: 'namliah-ops-2026' },
-  { username: 'admin', display_name: 'الإدارة', role: 'admin', password: 'namliah-admin-2026' }
+  { username: 'ops', display_name: 'مدير تشغيل فرع جدة', role: 'ops', branch: 'jeddah', password: 'namliah-ops-2026' },
+  { username: 'admin', display_name: 'الإدارة', role: 'admin', branch: null, password: 'namliah-admin-2026' }
 ];
 const insUser = db.prepare(
-  'INSERT OR IGNORE INTO users (username, display_name, password_hash, role) VALUES (?, ?, ?, ?)'
+  'INSERT OR IGNORE INTO users (username, display_name, password_hash, role, branch) VALUES (?, ?, ?, ?, ?)'
 );
-for (const u of USERS) insUser.run(u.username, u.display_name, hashPassword(u.password), u.role);
+for (const u of USERS) insUser.run(u.username, u.display_name, hashPassword(u.password), u.role, u.branch);
 const opsUser = db.prepare("SELECT id FROM users WHERE username = 'ops'").get();
 
 // ---- menu (لبناني) ----
@@ -47,8 +48,8 @@ function rand() {
 
 const insReport = db.prepare(`
   INSERT OR IGNORE INTO daily_reports
-    (report_date, status, total_sales, orders_count, avg_ticket, payment_breakdown, channel_breakdown, deductions, hall_sales, approved_at, approved_by, is_demo)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    (branch, report_date, status, total_sales, orders_count, avg_ticket, payment_breakdown, channel_breakdown, deductions, deduction_notes, hall_sales, approved_at, approved_by, is_demo)
+  VALUES ('jeddah', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
 `);
 const insLine = db.prepare(
   'INSERT INTO sales_lines (report_id, product_name, category, qty, unit_price, total) VALUES (?, ?, ?, ?, ?, ?)'
@@ -86,7 +87,7 @@ const NOTES_BY_CATEGORY = {
 };
 
 // عدد طاولات الصالة الافتراضي (يعدّله مدير التشغيل من المنصة)
-db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('tables_count', '14')").run();
+db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('tables_count:jeddah', '14')").run();
 
 const today = new Date(Date.now() + 3 * 3600 * 1000); // Asia/Riyadh
 let created = 0;
@@ -115,12 +116,9 @@ const seedTx = db.transaction(() => {
     const online = +(total * (0.2 + rand() * 0.1)).toFixed(2);
     const card = +(total - cash - online).toFixed(2);
 
-    // الطلبات الخارجية (تطبيقات + استلام) ومبيعات الصالة موزعة على الويترز
-    const hunger = +(total * (0.1 + rand() * 0.08)).toFixed(2);
-    const jahez = +(total * (0.07 + rand() * 0.06)).toFixed(2);
-    const keeta = +(total * (0.03 + rand() * 0.04)).toFixed(2);
-    const takeaway = +(total * (0.14 + rand() * 0.06)).toFixed(2);
-    const hallTotal = +(total - hunger - jahez - keeta - takeaway).toFixed(2);
+    // الطلبات الخارجية = استلام فقط، والباقي مبيعات صالة موزعة على الويترز
+    const takeaway = +(total * (0.18 + rand() * 0.08)).toFixed(2);
+    const hallTotal = +(total - takeaway).toFixed(2);
 
     const weights = WAITERS.map(() => 0.6 + rand());
     const wSum = weights.reduce((a, b) => a + b, 0);
@@ -138,6 +136,15 @@ const seedTx = db.transaction(() => {
       discounts: +(total * (0.005 + rand() * 0.015)).toFixed(2),
       cancellations: +(total * (rand() * 0.01)).toFixed(2)
     };
+    const DEDUCTION_NOTE_SAMPLES = {
+      coupons: ['٣ بلوقر', 'حملة تيك توك', 'كوبونات افتتاح'],
+      discounts: ['خصم للمالك', 'خصم موظفين', 'ضيافة شركاء'],
+      cancellations: ['إرجاع طلب فيه مشكلة', 'إلغاء طاولة حجز مزدوج', 'خطأ إدخال كاشير']
+    };
+    const deductionNotes = {};
+    for (const [key, pool] of Object.entries(DEDUCTION_NOTE_SAMPLES)) {
+      if (rand() < 0.5) deductionNotes[key] = pool[Math.floor(rand() * pool.length)];
+    }
 
     const approved = i >= 2; // آخر يومين pending لتجربة الاعتماد
     const info = insReport.run(
@@ -145,8 +152,9 @@ const seedTx = db.transaction(() => {
       approved ? 'approved' : 'pending',
       total, orders, avg,
       JSON.stringify({ cash, card, online }),
-      JSON.stringify({ takeaway, hungerstation: hunger, jahez, keeta }),
+      JSON.stringify({ takeaway }),
       JSON.stringify(deductions),
+      JSON.stringify(deductionNotes),
       JSON.stringify(hallSales),
       approved ? `${date} 23:45:00` : null,
       approved ? opsUser.id : null
@@ -179,8 +187,8 @@ const REVIEWS = [
 ];
 const insReview = db.prepare(`
   INSERT OR IGNORE INTO reviews
-    (external_id, author_name, rating, text, review_date, photos, owner_reply, sentiment, is_demo)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+    (external_id, branch, author_name, rating, text, review_date, photos, owner_reply, sentiment, is_demo)
+  VALUES (?, 'jeddah', ?, ?, ?, ?, ?, ?, ?, 1)
 `);
 let reviewsCreated = 0;
 REVIEWS.forEach((rv, i) => {
@@ -194,5 +202,6 @@ REVIEWS.forEach((rv, i) => {
 });
 
 console.log(`✔ البذر اكتمل: ${created} يوم مبيعات جديد، ${reviewsCreated} مراجعة تجريبية.`);
-console.log('  الدخول: ops / namliah-ops-2026 (مدير التشغيل) — admin / namliah-admin-2026 (الإدارة)');
+console.log('  الدخول: ops / namliah-ops-2026 (مدير تشغيل فرع جدة) — admin / namliah-admin-2026 (الإدارة)');
+console.log('  لإضافة مدير فرع جديد: node scripts/add-user.js <username> <password> ops <abha|makkah>');
 console.log('  ملاحظة: غيّر كلمات المرور من داخل المنصة، وامسح البيانات التجريبية بـ npm run wipe-demo');

@@ -64,8 +64,10 @@ app.use((err, req, res, next) => {
 const PORT = Number(process.env.PORT || 3000);
 app.listen(PORT, () => {
   console.log(`منصة عمليات نملية تعمل على http://localhost:${PORT}`);
-  if (!process.env.WEBHOOK_SECRET) {
-    console.warn('⚠ WEBHOOK_SECRET غير مضبوط — نقطة استقبال المبيعات سترفض كل الطلبات (401)');
+  const hasAnySecret = process.env.WEBHOOK_SECRET ||
+    process.env.WEBHOOK_SECRET_JEDDAH || process.env.WEBHOOK_SECRET_ABHA || process.env.WEBHOOK_SECRET_MAKKAH;
+  if (!hasAnySecret) {
+    console.warn('تنبيه: لا يوجد مفتاح webhook لأي فرع (WEBHOOK_SECRET_JEDDAH/_ABHA/_MAKKAH) — نقطة استقبال المبيعات سترفض كل الطلبات (401)');
   }
   scheduler.start();
 });

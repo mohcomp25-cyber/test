@@ -1,7 +1,7 @@
 'use strict';
 const crypto = require('crypto');
 const session = require('express-session');
-const { db, audit } = require('./db');
+const { db, audit, BRANCHES, DEFAULT_BRANCH } = require('./db');
 
 // ---- scrypt password hashing (no external deps) ----
 
@@ -100,8 +100,14 @@ function login(req, res) {
   req.session.userId = user.id;
   req.session.role = user.role;
   req.session.displayName = user.display_name;
-  audit('login', user.id, { username: user.username });
-  res.json({ role: user.role, displayName: user.display_name });
+  req.session.branch = user.role === 'ops' ? (user.branch || DEFAULT_BRANCH) : null;
+  audit('login', user.id, { username: user.username, branch: user.branch });
+  res.json({
+    role: user.role,
+    displayName: user.display_name,
+    branch: req.session.branch,
+    branchName: req.session.branch ? BRANCHES[req.session.branch] : null
+  });
 }
 
 function logout(req, res) {
@@ -110,7 +116,12 @@ function logout(req, res) {
 
 function me(req, res) {
   if (!req.session || !req.session.userId) return res.status(401).json({ error: 'unauthorized' });
-  res.json({ role: req.session.role, displayName: req.session.displayName });
+  res.json({
+    role: req.session.role,
+    displayName: req.session.displayName,
+    branch: req.session.branch || null,
+    branchName: req.session.branch ? BRANCHES[req.session.branch] : null
+  });
 }
 
 function changePassword(req, res) {

@@ -1,5 +1,5 @@
 'use strict';
-const { db, audit } = require('./../db');
+const { db, audit, BRANCHES, DEFAULT_BRANCH } = require('./../db');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -47,7 +47,7 @@ function validatePayload(body) {
   return errors;
 }
 
-const ingestTx = db.transaction((body) => {
+const ingestTx = db.transaction((branch, body) => {
   const s = body.summary;
   const avgTicket = s.avg_ticket != null
     ? s.avg_ticket
@@ -57,7 +57,7 @@ const ingestTx = db.transaction((body) => {
   const deductions = s.deductions || {};
   const hallSales = Array.isArray(s.hall_sales) ? s.hall_sales : [];
 
-  const existing = db.prepare('SELECT id, status FROM daily_reports WHERE report_date = ?').get(body.date);
+  const existing = db.prepare('SELECT id, status FROM daily_reports WHERE branch = ? AND report_date = ?').get(branch, body.date);
   if (existing && existing.status === 'approved') {
     return { status: 'already_approved' };
   }
@@ -77,18 +77,24 @@ const ingestTx = db.transaction((body) => {
       JSON.stringify(deductions), JSON.stringify(hallSales),
       JSON.stringify(body), existing.id
     );
+    if (s.deduction_notes && typeof s.deduction_notes === 'object') {
+      db.prepare('UPDATE daily_reports SET deduction_notes = ? WHERE id = ?')
+        .run(JSON.stringify(s.deduction_notes), existing.id);
+    }
     db.prepare('DELETE FROM sales_lines WHERE report_id = ?').run(existing.id);
     reportId = existing.id;
     action = 'updated';
   } else {
     const info = db.prepare(`
       INSERT INTO daily_reports
-        (report_date, total_sales, orders_count, avg_ticket, payment_breakdown, channel_breakdown, deductions, hall_sales, raw_payload)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (branch, report_date, total_sales, orders_count, avg_ticket, payment_breakdown, channel_breakdown, deductions, deduction_notes, hall_sales, raw_payload)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      body.date, s.total_sales, s.orders_count, avgTicket,
+      branch, body.date, s.total_sales, s.orders_count, avgTicket,
       JSON.stringify(s.payment_breakdown || {}), JSON.stringify(externalSales),
-      JSON.stringify(deductions), JSON.stringify(hallSales),
+      JSON.stringify(deductions),
+      JSON.stringify((s.deduction_notes && typeof s.deduction_notes === 'object') ? s.deduction_notes : {}),
+      JSON.stringify(hallSales),
       JSON.stringify(body)
     );
     reportId = info.lastInsertRowid;
@@ -105,10 +111,10 @@ const ingestTx = db.transaction((body) => {
   return { status: action, reportId };
 });
 
-function ingestWebhook(body) {
-  const result = ingestTx(body);
+function ingestWebhook(branch, body) {
+  const result = ingestTx(branch, body);
   if (result.status !== 'already_approved') {
-    audit('webhook_received', null, { date: body.date, action: result.status, lines: body.lines.length });
+    audit('webhook_received', null, { branch, date: body.date, action: result.status, lines: body.lines.length });
   }
   return result;
 }
@@ -118,6 +124,8 @@ function ingestWebhook(body) {
 function reportRowToJson(row) {
   return {
     id: row.id,
+    branch: row.branch,
+    branch_name: BRANCHES[row.branch] || row.branch,
     report_date: row.report_date,
     status: row.status,
     total_sales: row.total_sales,
@@ -126,6 +134,7 @@ function reportRowToJson(row) {
     payment_breakdown: JSON.parse(row.payment_breakdown || '{}'),
     external_sales: JSON.parse(row.channel_breakdown || '{}'),
     deductions: JSON.parse(row.deductions || '{}'),
+    deduction_notes: JSON.parse(row.deduction_notes || '{}'),
     hall_sales: JSON.parse(row.hall_sales || '[]'),
     received_at: row.received_at,
     approved_at: row.approved_at,
@@ -134,12 +143,12 @@ function reportRowToJson(row) {
   };
 }
 
-function getReportByDate(date, { approvedOnly = false } = {}) {
+function getReportByDate(branch, date, { approvedOnly = false } = {}) {
   const row = db.prepare(`
     SELECT r.*, u.display_name AS approved_by_name
     FROM daily_reports r LEFT JOIN users u ON u.id = r.approved_by
-    WHERE r.report_date = ? ${approvedOnly ? "AND r.status = 'approved'" : ''}
-  `).get(date);
+    WHERE r.branch = ? AND r.report_date = ? ${approvedOnly ? "AND r.status = 'approved'" : ''}
+  `).get(branch, date);
   if (!row) return null;
   const report = reportRowToJson(row);
   report.lines = db.prepare(
@@ -153,17 +162,17 @@ function getReportByDate(date, { approvedOnly = false } = {}) {
   return report;
 }
 
-function latestReportDate(maxDate) {
+function latestReportDate(branch, maxDate) {
   const row = db.prepare(
-    'SELECT report_date FROM daily_reports WHERE report_date <= ? ORDER BY report_date DESC LIMIT 1'
-  ).get(maxDate);
+    'SELECT report_date FROM daily_reports WHERE branch = ? AND report_date <= ? ORDER BY report_date DESC LIMIT 1'
+  ).get(branch, maxDate);
   return row ? row.report_date : null;
 }
 
-function listDates() {
+function listDates(branch) {
   return db.prepare(
-    'SELECT report_date, status FROM daily_reports ORDER BY report_date DESC LIMIT 120'
-  ).all();
+    'SELECT report_date, status FROM daily_reports WHERE branch = ? ORDER BY report_date DESC LIMIT 120'
+  ).all(branch);
 }
 
 // ---- notes ----
@@ -189,8 +198,8 @@ const upsertNotesTx = db.transaction((reportId, userId, notesByCategory) => {
   }
 });
 
-function upsertOpsNotes(date, userId, notesByCategory) {
-  const report = db.prepare('SELECT id, status FROM daily_reports WHERE report_date = ?').get(date);
+function upsertOpsNotes(branch, date, userId, notesByCategory) {
+  const report = db.prepare('SELECT id, status FROM daily_reports WHERE branch = ? AND report_date = ?').get(branch, date);
   if (!report) return { error: 'no_report' };
   if (report.status === 'approved') return { error: 'report_already_approved' };
   const filtered = {};
@@ -198,48 +207,83 @@ function upsertOpsNotes(date, userId, notesByCategory) {
     if (cat in notesByCategory) filtered[cat] = notesByCategory[cat];
   }
   upsertNotesTx(report.id, userId, filtered);
-  audit('notes_saved', userId, { date, categories: Object.keys(filtered) });
+  audit('notes_saved', userId, { branch, date, categories: Object.keys(filtered) });
   return { ok: true };
 }
 
 // ---- approval (= publication to management) ----
 
-function approveReport(date, userId) {
-  const report = db.prepare('SELECT id, status FROM daily_reports WHERE report_date = ?').get(date);
+function approveReport(branch, date, userId) {
+  const report = db.prepare('SELECT id, status FROM daily_reports WHERE branch = ? AND report_date = ?').get(branch, date);
   if (!report) return { error: 'no_report' };
   if (report.status === 'approved') return { error: 'report_already_approved' };
   db.prepare(`
     UPDATE daily_reports SET status = 'approved', approved_at = datetime('now'), approved_by = ?
     WHERE id = ?
   `).run(userId, report.id);
-  audit('report_approved', userId, { date });
+  audit('report_approved', userId, { branch, date });
+  return { ok: true };
+}
+
+// ---- deduction notes (ملاحظات مدير التشغيل مقابل بنود الخصم) ----
+
+const DEDUCTION_KEYS = ['coupons', 'discounts', 'cancellations'];
+
+function saveDeductionNotes(branch, date, userId, notesObj) {
+  const report = db.prepare(
+    'SELECT id, status, deduction_notes FROM daily_reports WHERE branch = ? AND report_date = ?'
+  ).get(branch, date);
+  if (!report) return { error: 'no_report' };
+  if (report.status === 'approved') return { error: 'report_already_approved' };
+  const current = JSON.parse(report.deduction_notes || '{}');
+  for (const key of DEDUCTION_KEYS) {
+    if (key in notesObj) {
+      const val = String(notesObj[key] || '').trim();
+      if (val) current[key] = val; else delete current[key];
+    }
+  }
+  db.prepare('UPDATE daily_reports SET deduction_notes = ? WHERE id = ?')
+    .run(JSON.stringify(current), report.id);
+  audit('deduction_notes_saved', userId, { branch, date });
   return { ok: true };
 }
 
 // ---- admin aggregates ----
 
-function listApproved(from, to) {
-  return db.prepare(`
-    SELECT r.report_date, r.status, r.total_sales, r.orders_count, r.avg_ticket, r.approved_at,
-           (SELECT substr(n.body, 1, 120) FROM notes n WHERE n.report_id = r.id ORDER BY n.created_at LIMIT 1) AS note_preview
-    FROM daily_reports r
-    WHERE r.status = 'approved' AND r.report_date BETWEEN ? AND ?
-    ORDER BY r.report_date DESC
-  `).all(from, to);
+function branchFilterSql(branch) {
+  return branch && branch !== 'all' ? 'AND r.branch = ?' : '';
+}
+function branchFilterArgs(branch) {
+  return branch && branch !== 'all' ? [branch] : [];
 }
 
-function dashboardData(from, to) {
-  const reports = db.prepare(`
-    SELECT * FROM daily_reports
-    WHERE status = 'approved' AND report_date BETWEEN ? AND ?
-    ORDER BY report_date
-  `).all(from, to);
+function listApproved(branch, from, to) {
+  return db.prepare(`
+    SELECT r.branch, r.report_date, r.status, r.total_sales, r.orders_count, r.avg_ticket, r.approved_at,
+           (SELECT substr(n.body, 1, 120) FROM notes n WHERE n.report_id = r.id ORDER BY n.created_at LIMIT 1) AS note_preview
+    FROM daily_reports r
+    WHERE r.status = 'approved' AND r.report_date BETWEEN ? AND ? ${branchFilterSql(branch)}
+    ORDER BY r.report_date DESC
+  `).all(from, to, ...branchFilterArgs(branch));
+}
 
-  const trend = reports.map((r) => ({
-    date: r.report_date,
-    total_sales: r.total_sales,
-    orders_count: r.orders_count,
-    avg_ticket: r.avg_ticket
+function dashboardData(branch, from, to) {
+  const reports = db.prepare(`
+    SELECT * FROM daily_reports r
+    WHERE r.status = 'approved' AND r.report_date BETWEEN ? AND ? ${branchFilterSql(branch)}
+    ORDER BY r.report_date
+  `).all(from, to, ...branchFilterArgs(branch));
+
+  const trendByDate = new Map();
+  for (const r of reports) {
+    const t = trendByDate.get(r.report_date) || { date: r.report_date, total_sales: 0, orders_count: 0 };
+    t.total_sales += r.total_sales;
+    t.orders_count += r.orders_count;
+    trendByDate.set(r.report_date, t);
+  }
+  const trend = [...trendByDate.values()].map((t) => ({
+    ...t,
+    avg_ticket: t.orders_count > 0 ? t.total_sales / t.orders_count : 0
   }));
 
   const totals = {
@@ -295,7 +339,7 @@ function dashboardData(from, to) {
       GROUP BY category ORDER BY total DESC
     `).all(...ids);
     notesFeed = db.prepare(`
-      SELECT r.report_date, n.category, n.body, u.display_name AS author, n.updated_at
+      SELECT r.report_date, r.branch, n.category, n.body, u.display_name AS author, n.updated_at
       FROM notes n
       JOIN daily_reports r ON r.id = n.report_id
       JOIN users u ON u.id = n.author_id
@@ -310,6 +354,8 @@ function dashboardData(from, to) {
 module.exports = {
   DATE_RE,
   NOTE_CATEGORIES,
+  DEDUCTION_KEYS,
+  saveDeductionNotes,
   riyadhToday,
   validatePayload,
   ingestWebhook,

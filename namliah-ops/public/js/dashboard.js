@@ -4,6 +4,8 @@
 const charts = {};
 let currentSentiment = '';
 let reviewsPage = 1;
+let currentBranch = 'all';
+let currentRange = null;
 
 function destroyChart(id) {
   if (charts[id]) { charts[id].destroy(); delete charts[id]; }
@@ -25,7 +27,8 @@ function moneyTick(v) {
 }
 
 async function loadDashboard(from, to) {
-  const data = await api(`/api/admin/dashboard?from=${from}&to=${to}`);
+  currentRange = { from, to };
+  const data = await api(`/api/admin/dashboard?from=${from}&to=${to}&branch=${currentBranch}`);
 
   // KPIs
   document.getElementById('kpiSales').textContent = money(data.totals.total_sales);
@@ -188,7 +191,7 @@ async function loadDashboard(from, to) {
   });
 
   // جدول التقارير المعتمدة
-  const reportsList = await api(`/api/admin/reports?from=${from}&to=${to}`);
+  const reportsList = await api(`/api/admin/reports?from=${from}&to=${to}&branch=${currentBranch}`);
   document.getElementById('reportsBody').innerHTML = reportsList.reports.map((r) => `
     <tr>
       <td><b>${r.report_date}</b></td>
@@ -196,7 +199,7 @@ async function loadDashboard(from, to) {
       <td class="num">${nf0.format(r.orders_count)}</td>
       <td class="num">${money(r.avg_ticket)}</td>
       <td class="muted" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.note_preview || '—')}</td>
-      <td><a class="btn btn--outline btn--sm" href="/report/${r.report_date}/print" target="_blank">عرض / طباعة</a></td>
+      <td><a class="btn btn--outline btn--sm" href="/report/${r.report_date}/print?branch=${r.branch}" target="_blank">عرض / طباعة</a></td>
     </tr>`).join('') || '<tr><td colspan="6" class="muted" style="text-align:center;padding:30px">لا توجد تقارير معتمدة في هذا المدى</td></tr>';
 
   // تغذية الملاحظات المصنفة
@@ -213,14 +216,14 @@ async function loadDashboard(from, to) {
 
 async function loadReviews(reset = true) {
   if (reset) reviewsPage = 1;
-  const data = await api(`/api/reviews?page=${reviewsPage}${currentSentiment ? `&sentiment=${currentSentiment}` : ''}`);
+  const data = await api(`/api/reviews?page=${reviewsPage}&branch=${currentBranch}${currentSentiment ? `&sentiment=${currentSentiment}` : ''}`);
   const grid = document.getElementById('reviewsGrid');
   const html = data.reviews.map(reviewCardHtml).join('');
   if (reset) grid.innerHTML = html || '<p class="muted">لا توجد مراجعات مطابقة</p>';
   else grid.insertAdjacentHTML('beforeend', html);
   document.getElementById('moreReviewsBtn').style.display = reviewsPage < data.pages ? 'inline-flex' : 'none';
 
-  const stats = await api('/api/reviews/stats');
+  const stats = await api(`/api/reviews/stats?branch=${currentBranch}`);
   document.getElementById('reviewsMeta').textContent = stats.configured
     ? (stats.last_sync_at ? `آخر مزامنة: ${stats.last_sync_at.slice(0, 16).replace('T', ' ')}` : 'لم تتم مزامنة بعد')
     : 'المزامنة غير مُفعّلة (أضف APIFY_TOKEN في الخادم)';
@@ -235,6 +238,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('toDate').value = to;
   await loadDashboard(from, to);
   loadReviews().catch(() => {});
+
+  document.querySelectorAll('.filter-chip[data-branch]').forEach((chip) => {
+    chip.addEventListener('click', async () => {
+      document.querySelectorAll('.filter-chip[data-branch]').forEach((c) => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentBranch = chip.dataset.branch;
+      await loadDashboard(currentRange.from, currentRange.to);
+      loadReviews().catch(() => {});
+    });
+  });
 
   document.querySelectorAll('.filter-chip[data-days]').forEach((chip) => {
     chip.addEventListener('click', async () => {
@@ -272,7 +285,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('syncReviewsBtn').addEventListener('click', async () => {
     const btn = document.getElementById('syncReviewsBtn');
     try {
-      await api('/api/reviews/sync', { method: 'POST' });
+      await api(`/api/reviews/sync?branch=${currentBranch}`, { method: 'POST' });
       toast('بدأت المزامنة — قد تستغرق دقيقة إلى دقيقتين');
       btn.disabled = true;
       btn.textContent = '⏳ جارٍ المزامنة…';
