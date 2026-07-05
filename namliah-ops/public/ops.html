@@ -71,6 +71,22 @@
       <div class="chips-row" id="paymentChips" style="flex:1"></div>
     </section>
 
+    <!-- المبيعات بالساعة -->
+    <section>
+      <h2 class="section-title" style="margin-bottom:12px">المبيعات بالساعة</h2>
+      <div class="hourly-grid">
+        <div class="hourly-kpis">
+          <div class="kpi-card"><div class="kpi-label">وقت الذروة</div><div class="kpi-value" id="kpiPeak">—</div><div class="kpi-sub" id="kpiPeakSub"></div></div>
+          <div class="kpi-card"><div class="kpi-label">أول طلب</div><div class="kpi-value" id="kpiFirstOrder">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">آخر طلب</div><div class="kpi-value" id="kpiLastOrder">—</div></div>
+        </div>
+        <div class="card chart-card">
+          <div class="chart-box" id="hourlyBox"><canvas id="hourlyChart"></canvas></div>
+          <p class="muted" id="hourlyEmpty" style="display:none;text-align:center;padding:30px 0">لم تصل بيانات المبيعات بالساعة من الوورك فلو بعد.</p>
+        </div>
+      </div>
+    </section>
+
     <!-- توزيع المبيعات: الصالة عريضة + بطاقة استلام صغيرة ملاصقة -->
     <section>
       <h2 class="section-title" style="margin-bottom:12px">توزيع المبيعات</h2>
@@ -173,6 +189,8 @@
   </div>
 </main>
 
+<script src="/js/vendor/chart.umd.min.js"></script>
+<script src="/js/charts-theme.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/ops.js"></script>
 </body>

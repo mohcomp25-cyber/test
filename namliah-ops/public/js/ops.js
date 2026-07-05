@@ -80,6 +80,64 @@ function renderExternal(mix, reportTotal) {
     <div class="mix-row"><span class="mix-name">${esc(mixLabel(k))}</span><span class="mix-val">${money(v)}</span></div>`).join('');
 }
 
+// المبيعات بالساعة: بطاقات الذروة/أول/آخر طلب + رسم أعمدة
+let hourlyChart = null;
+function renderHourly(report) {
+  const hourly = (report.hourly_sales || []).filter((h) => (h.total || 0) > 0);
+  const box = document.getElementById('hourlyBox');
+  const empty = document.getElementById('hourlyEmpty');
+
+  if (!hourly.length) {
+    box.style.display = 'none';
+    empty.style.display = 'block';
+    document.getElementById('kpiPeak').textContent = '—';
+    document.getElementById('kpiPeakSub').textContent = '';
+    document.getElementById('kpiFirstOrder').textContent = report.first_order_at || '—';
+    document.getElementById('kpiLastOrder').textContent = report.last_order_at || '—';
+    if (hourlyChart) { hourlyChart.destroy(); hourlyChart = null; }
+    return;
+  }
+  box.style.display = '';
+  empty.style.display = 'none';
+
+  const peak = hourly.reduce((a, b) => (b.total > a.total ? b : a));
+  const hh = (h) => `${String(h).padStart(2, '0')}:00`;
+  document.getElementById('kpiPeak').textContent = hh(peak.hour);
+  document.getElementById('kpiPeakSub').textContent =
+    `${money(peak.total)}${peak.orders ? ` · ${nf0.format(peak.orders)} طلب` : ''}`;
+  document.getElementById('kpiFirstOrder').textContent = report.first_order_at || hh(hourly[0].hour);
+  document.getElementById('kpiLastOrder').textContent = report.last_order_at || hh(hourly[hourly.length - 1].hour);
+
+  if (hourlyChart) hourlyChart.destroy();
+  hourlyChart = new Chart(document.getElementById('hourlyChart'), {
+    type: 'bar',
+    data: {
+      labels: hourly.map((h) => hh(h.hour)),
+      datasets: [{
+        label: 'المبيعات',
+        data: hourly.map((h) => h.total),
+        backgroundColor: CHART_COLORS[0],
+        maxBarThickness: 24
+      }]
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (c) => ` ${money(c.parsed.y)}${hourly[c.dataIndex].orders ? ` · ${nf0.format(hourly[c.dataIndex].orders)} طلب` : ''}`
+          }
+        }
+      },
+      scales: {
+        x: { reverse: true, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { callback: (v) => (v >= 1000 ? `${nf.format(v / 1000)}k` : nf0.format(v)) } }
+      }
+    }
+  });
+}
+
 function linesRow(l, i) {
   return `<tr><td>${i + 1}</td><td>${esc(l.product_name)}</td><td class="num">${nf.format(l.qty)}</td><td class="num">${money(l.total)}</td></tr>`;
 }
@@ -122,6 +180,7 @@ async function loadReport(date) {
 
   // طرق الدفع المصغّرة + توزيع المبيعات
   renderChips(document.getElementById('paymentChips'), report.payment_breakdown);
+  renderHourly(report);
   renderWaiters(report.hall_sales || []);
   renderExternal(report.external_sales || {}, report.total_sales);
   renderTableAvg();

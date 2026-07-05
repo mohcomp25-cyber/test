@@ -25,6 +25,18 @@ function validatePayload(body) {
     if (s.channel_breakdown != null && typeof s.channel_breakdown !== 'object') errors.push('summary.channel_breakdown');
     if (s.external_sales != null && typeof s.external_sales !== 'object') errors.push('summary.external_sales');
     if (s.deductions != null && typeof s.deductions !== 'object') errors.push('summary.deductions');
+    if (s.hourly_sales != null) {
+      if (!Array.isArray(s.hourly_sales)) errors.push('summary.hourly_sales');
+      else s.hourly_sales.forEach((h, i) => {
+        if (!h || typeof h !== 'object' || !Number.isInteger(h.hour) || h.hour < 0 || h.hour > 23 ||
+            typeof h.total !== 'number') {
+          errors.push(`summary.hourly_sales[${i}]`);
+        }
+      });
+    }
+    const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+    if (s.first_order_at != null && !TIME_RE.test(s.first_order_at)) errors.push('summary.first_order_at');
+    if (s.last_order_at != null && !TIME_RE.test(s.last_order_at)) errors.push('summary.last_order_at');
     if (s.hall_sales != null) {
       if (!Array.isArray(s.hall_sales)) errors.push('summary.hall_sales');
       else s.hall_sales.forEach((w, i) => {
@@ -56,6 +68,15 @@ const ingestTx = db.transaction((branch, body) => {
   const externalSales = s.external_sales || s.channel_breakdown || {};
   const deductions = s.deductions || {};
   const hallSales = Array.isArray(s.hall_sales) ? s.hall_sales : [];
+  const hourly = Array.isArray(s.hourly_sales)
+    ? [...s.hourly_sales].sort((a, b) => a.hour - b.hour)
+    : [];
+  const activeHours = hourly.filter((h) => (h.total || 0) > 0 || (h.orders || 0) > 0);
+  const pad = (n) => String(n).padStart(2, '0');
+  const firstOrderAt = s.first_order_at ||
+    (activeHours.length ? `${pad(activeHours[0].hour)}:00` : null);
+  const lastOrderAt = s.last_order_at ||
+    (activeHours.length ? `${pad(activeHours[activeHours.length - 1].hour)}:00` : null);
 
   const existing = db.prepare('SELECT id, status FROM daily_reports WHERE branch = ? AND report_date = ?').get(branch, body.date);
   if (existing && existing.status === 'approved') {
@@ -69,12 +90,14 @@ const ingestTx = db.transaction((branch, body) => {
       UPDATE daily_reports SET
         total_sales = ?, orders_count = ?, avg_ticket = ?,
         payment_breakdown = ?, channel_breakdown = ?, deductions = ?, hall_sales = ?,
+        hourly_sales = ?, first_order_at = ?, last_order_at = ?,
         raw_payload = ?, received_at = datetime('now'), is_demo = 0
       WHERE id = ?
     `).run(
       s.total_sales, s.orders_count, avgTicket,
       JSON.stringify(s.payment_breakdown || {}), JSON.stringify(externalSales),
       JSON.stringify(deductions), JSON.stringify(hallSales),
+      JSON.stringify(hourly), firstOrderAt, lastOrderAt,
       JSON.stringify(body), existing.id
     );
     if (s.deduction_notes && typeof s.deduction_notes === 'object') {
@@ -87,14 +110,15 @@ const ingestTx = db.transaction((branch, body) => {
   } else {
     const info = db.prepare(`
       INSERT INTO daily_reports
-        (branch, report_date, total_sales, orders_count, avg_ticket, payment_breakdown, channel_breakdown, deductions, deduction_notes, hall_sales, raw_payload)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (branch, report_date, total_sales, orders_count, avg_ticket, payment_breakdown, channel_breakdown, deductions, deduction_notes, hall_sales, hourly_sales, first_order_at, last_order_at, raw_payload)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       branch, body.date, s.total_sales, s.orders_count, avgTicket,
       JSON.stringify(s.payment_breakdown || {}), JSON.stringify(externalSales),
       JSON.stringify(deductions),
       JSON.stringify((s.deduction_notes && typeof s.deduction_notes === 'object') ? s.deduction_notes : {}),
       JSON.stringify(hallSales),
+      JSON.stringify(hourly), firstOrderAt, lastOrderAt,
       JSON.stringify(body)
     );
     reportId = info.lastInsertRowid;
@@ -136,6 +160,9 @@ function reportRowToJson(row) {
     deductions: JSON.parse(row.deductions || '{}'),
     deduction_notes: JSON.parse(row.deduction_notes || '{}'),
     hall_sales: JSON.parse(row.hall_sales || '[]'),
+    hourly_sales: JSON.parse(row.hourly_sales || '[]'),
+    first_order_at: row.first_order_at || null,
+    last_order_at: row.last_order_at || null,
     received_at: row.received_at,
     approved_at: row.approved_at,
     approved_by_name: row.approved_by_name || null,
@@ -173,6 +200,14 @@ function listDates(branch) {
   return db.prepare(
     'SELECT report_date, status FROM daily_reports WHERE branch = ? ORDER BY report_date DESC LIMIT 120'
   ).all(branch);
+}
+
+// ذروة المبيعات — من مصفوفة الساعات
+function hourlyStats(hourly) {
+  const rows = (Array.isArray(hourly) ? hourly : []).filter((h) => (h.total || 0) > 0);
+  if (!rows.length) return { peak: null };
+  const peak = rows.reduce((a, b) => (b.total > a.total ? b : a));
+  return { peak: { hour: peak.hour, total: peak.total, orders: peak.orders || null } };
 }
 
 // ---- notes ----
@@ -318,6 +353,19 @@ function dashboardData(branch, from, to) {
       }
     }
   }
+  const hourlyTotals = {};
+  for (const r of reports) {
+    for (const h of JSON.parse(r.hourly_sales || '[]')) {
+      if (h && Number.isInteger(h.hour) && typeof h.total === 'number') {
+        hourlyTotals[h.hour] = (hourlyTotals[h.hour] || 0) + h.total;
+      }
+    }
+  }
+  const dayCount = Math.max(1, reports.length);
+  const hourlyMix = Object.entries(hourlyTotals)
+    .map(([hour, total]) => ({ hour: Number(hour), avg_total: total / dayCount }))
+    .sort((a, b) => a.hour - b.hour);
+
   const waiters = Object.entries(waiterTotals)
     .map(([waiter, total]) => ({ waiter, total }))
     .sort((a, b) => b.total - a.total);
@@ -348,7 +396,7 @@ function dashboardData(branch, from, to) {
     `).all(...ids);
   }
 
-  return { totals, trend, paymentMix, externalMix, deductionsMix, waiters, topProducts, categoryMix, notesFeed };
+  return { totals, trend, paymentMix, externalMix, deductionsMix, waiters, hourlyMix, topProducts, categoryMix, notesFeed };
 }
 
 module.exports = {
@@ -356,6 +404,7 @@ module.exports = {
   NOTE_CATEGORIES,
   DEDUCTION_KEYS,
   saveDeductionNotes,
+  hourlyStats,
   riyadhToday,
   validatePayload,
   ingestWebhook,

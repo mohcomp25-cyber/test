@@ -3,7 +3,8 @@ const cron = require('node-cron');
 const apify = require('./services/apify');
 
 function start() {
-  const schedule = process.env.REVIEWS_CRON || '30 3 * * *';
+  // الافتراضي: ١٢ ليلاً بتوقيت الرياض — مزامنة مراجعات يوم العمل المنتهي فقط
+  const schedule = process.env.REVIEWS_CRON || '0 0 * * *';
   cron.schedule(schedule, async () => {
     const branches = apify.configuredBranches();
     if (!branches.length) {

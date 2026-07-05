@@ -48,8 +48,8 @@ function rand() {
 
 const insReport = db.prepare(`
   INSERT OR IGNORE INTO daily_reports
-    (branch, report_date, status, total_sales, orders_count, avg_ticket, payment_breakdown, channel_breakdown, deductions, deduction_notes, hall_sales, approved_at, approved_by, is_demo)
-  VALUES ('jeddah', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    (branch, report_date, status, total_sales, orders_count, avg_ticket, payment_breakdown, channel_breakdown, deductions, deduction_notes, hall_sales, hourly_sales, first_order_at, last_order_at, approved_at, approved_by, is_demo)
+  VALUES ('jeddah', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
 `);
 const insLine = db.prepare(
   'INSERT INTO sales_lines (report_id, product_name, category, qty, unit_price, total) VALUES (?, ?, ?, ?, ?, ?)'
@@ -146,6 +146,25 @@ const seedTx = db.transaction(() => {
       if (rand() < 0.5) deductionNotes[key] = pool[Math.floor(rand() * pool.length)];
     }
 
+    // المبيعات بالساعة: عمل من ١٢ ظهراً حتى ١١ ليلاً بذروتي غداء وعشاء
+    const HOUR_WEIGHTS = { 12: 0.5, 13: 1.0, 14: 1.1, 15: 0.7, 16: 0.35, 17: 0.35, 18: 0.6, 19: 1.0, 20: 1.35, 21: 1.5, 22: 1.05, 23: 0.5 };
+    const wTotal = Object.values(HOUR_WEIGHTS).reduce((a, b) => a + b, 0);
+    let hAllocated = 0;
+    let oAllocated = 0;
+    const hourEntries = Object.entries(HOUR_WEIGHTS);
+    const hourlySales = hourEntries.map(([hourStr, weight], hi) => {
+      const hour = Number(hourStr);
+      const jitter = 0.8 + rand() * 0.4;
+      const isLast = hi === hourEntries.length - 1;
+      const hTotal = isLast ? +(total - hAllocated).toFixed(2) : +((total * weight * jitter) / wTotal).toFixed(2);
+      const hOrders = isLast ? Math.max(1, orders - oAllocated) : Math.max(1, Math.round((orders * weight) / wTotal));
+      hAllocated = +(hAllocated + hTotal).toFixed(2);
+      oAllocated += hOrders;
+      return { hour, total: hTotal, orders: hOrders };
+    });
+    const firstOrderAt = `12:${String(Math.floor(rand() * 20)).padStart(2, '0')}`;
+    const lastOrderAt = `23:${String(30 + Math.floor(rand() * 25)).padStart(2, '0')}`;
+
     const approved = i >= 2; // آخر يومين pending لتجربة الاعتماد
     const info = insReport.run(
       date,
@@ -156,6 +175,9 @@ const seedTx = db.transaction(() => {
       JSON.stringify(deductions),
       JSON.stringify(deductionNotes),
       JSON.stringify(hallSales),
+      JSON.stringify(hourlySales),
+      firstOrderAt,
+      lastOrderAt,
       approved ? `${date} 23:45:00` : null,
       approved ? opsUser.id : null
     );

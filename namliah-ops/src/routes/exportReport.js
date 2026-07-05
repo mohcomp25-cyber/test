@@ -17,8 +17,7 @@ const money = (n) => `${fmt.format(n || 0)} ر.س`;
 
 const LABELS = {
   cash: 'نقدي', card: 'شبكة/بطاقة', online: 'دفع إلكتروني', other: 'أخرى',
-  dine_in: 'صالة', takeaway: 'استلام', delivery: 'توصيل', delivery_apps: 'تطبيقات التوصيل',
-  hungerstation: 'هنقرستيشن', jahez: 'جاهز', toyou: 'تويو', mrsool: 'مرسول', keeta: 'كيتا',
+  dine_in: 'صالة', hall: 'صالة', takeaway: 'استلام',
   coupons: 'كوبونات', discounts: 'خصومات', cancellations: 'إلغاءات'
 };
 const label = (k) => LABELS[k.split(':').pop()] || k.split(':').pop();
@@ -108,6 +107,24 @@ router.get('/:date/print', requireAuth, (req, res) => {
     `${l}: <b>${money(v || 0)}</b>${note ? ` <span class="ded-note">(${esc(note)})</span>` : ''}`
   ).join(' · ');
 
+  // المبيعات بالساعة: الذروة + أعمدة CSS مصغّرة
+  const hourly = (report.hourly_sales || []).filter((h) => (h.total || 0) > 0);
+  const { peak } = reports.hourlyStats(hourly);
+  const hh = (h) => `${String(h).padStart(2, '0')}:00`;
+  const timingLine = peak
+    ? `وقت الذروة: <b>${hh(peak.hour)}</b> (${money(peak.total)}) · أول طلب: <b>${esc(report.first_order_at || hh(hourly[0].hour))}</b> · آخر طلب: <b>${esc(report.last_order_at || hh(hourly[hourly.length - 1].hour))}</b>`
+    : null;
+  const maxHour = peak ? peak.total : 1;
+  const hourlyBars = hourly.length ? `
+    <div class="hours">
+      ${hourly.map((h) => `
+        <div class="hour-col" title="${hh(h.hour)} — ${money(h.total)}">
+          <span class="hour-val">${h.total >= 1000 ? `${fmt.format(h.total / 1000)}k` : fmt.format(Math.round(h.total))}</span>
+          <span class="hour-bar" style="height:${Math.max(4, Math.round((h.total / maxHour) * 70))}px"></span>
+          <span class="hour-lbl">${hh(h.hour)}</span>
+        </div>`).join('')}
+    </div>` : '';
+
   const lines = report.lines || [];
   const topLines = lines.slice(0, 10);
   const bottomLines = lines.length > 10 ? lines.slice(-10).reverse() : [];
@@ -168,6 +185,11 @@ router.get('/:date/print', requireAuth, (req, res) => {
   .deductions{background:var(--bone);border:1px dashed var(--brass);border-radius:10px;padding:7px 14px;margin-top:10px;font-size:12.5px;color:var(--ink-soft)}
   .deductions b{color:var(--ink);font-variant-numeric:tabular-nums}
   .ded-note{color:var(--brass-deep);font-size:11.5px}
+  .hours{display:flex;align-items:flex-end;gap:6px;background:#fff;border:1px solid var(--line-soft);border-radius:10px;padding:12px 14px 8px;overflow-x:auto}
+  .hour-col{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:34px;flex:1}
+  .hour-val{font-size:9.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+  .hour-bar{width:100%;max-width:26px;background:linear-gradient(180deg,#6B7A3B,#5F7A26);border-radius:4px 4px 0 0}
+  .hour-lbl{font-size:9.5px;color:var(--ink-soft);direction:ltr}
   .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   .mix-row{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed var(--line-soft)}
   .mix-row .pct{min-width:44px;text-align:left;direction:ltr}
@@ -217,6 +239,9 @@ router.get('/:date/print', requireAuth, (req, res) => {
       <div class="kpi"><div class="lbl">متوسط مبيعات الطاولة</div><div class="val">${tableAvg ? money(tableAvg) : '—'}</div></div>
     </div>
     <div class="deductions">${deductionsLine}${tablesCount ? ` · عدد الطاولات: <b>${fmt.format(tablesCount)}</b>` : ''}</div>
+    ${timingLine ? `<div class="deductions" style="margin-top:6px">${timingLine}</div>` : ''}
+
+    ${hourlyBars ? `<h2>المبيعات بالساعة</h2>${hourlyBars}` : ''}
 
     <h2>توزيع المبيعات</h2>
     <div class="cols">

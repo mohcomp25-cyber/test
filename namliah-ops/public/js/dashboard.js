@@ -161,7 +161,36 @@ async function loadDashboard(from, to) {
     });
   };
   doughnut('paymentChart', data.paymentMix);
-  doughnut('channelChart', data.externalMix);
+  // الصالة مقابل الاستلام (لا مبيعات تطبيقات)
+  const hallTotal = (data.waiters || []).reduce((a, w) => a + w.total, 0);
+  const pickupTotal = flattenMix(data.externalMix).takeaway || 0;
+  doughnut('channelChart', { hall: hallTotal, takeaway: pickupTotal });
+
+  // متوسط المبيعات بالساعة (عبر الأيام المعتمدة) — سلسلة واحدة
+  const hourlyMix = data.hourlyMix || [];
+  makeChart('hourlyAvgChart', {
+    type: 'bar',
+    data: {
+      labels: hourlyMix.map((h) => `${String(h.hour).padStart(2, '0')}:00`),
+      datasets: [{
+        label: 'متوسط المبيعات',
+        data: hourlyMix.map((h) => h.avg_total),
+        backgroundColor: CHART_COLORS[0],
+        maxBarThickness: 20
+      }]
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (c) => ` ${money(c.parsed.y)}` } }
+      },
+      scales: {
+        x: { reverse: true, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { callback: moneyTick } }
+      }
+    }
+  });
 
   // مبيعات الصالة حسب الويتر — سلسلة اسمية واحدة: لون واحد
   const waiters = data.waiters || [];

@@ -44,9 +44,14 @@ async function apifyFetch(pathname, options) {
 }
 
 async function startRun(branch) {
+  // توفير التوكن: نسحب مراجعات يوم العمل فقط (من أمس بتوقيت الرياض)
+  // — التكرار بين الليالي يُرشَّح تلقائياً بالـ upsert على external_id
+  const yesterdayRiyadh = new Date(Date.now() + 3 * 3600 * 1000 - 86400000)
+    .toISOString().slice(0, 10);
   const input = {
     startUrls: [{ url: mapsUrlFor(branch) }],
-    maxReviews: Number(process.env.APIFY_MAX_REVIEWS || 200),
+    maxReviews: Number(process.env.APIFY_MAX_REVIEWS || 50),
+    reviewsStartDate: process.env.APIFY_REVIEWS_START_DATE || yesterdayRiyadh,
     reviewsSort: 'newest',
     language: 'ar',
     personalData: true

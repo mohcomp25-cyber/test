@@ -27,8 +27,7 @@ const money = (n) => `${nf.format(n || 0)} ر.س`;
 
 const MIX_LABELS = {
   cash: 'نقدي', card: 'شبكة/بطاقة', online: 'دفع إلكتروني', other: 'أخرى',
-  dine_in: 'صالة', takeaway: 'استلام', delivery: 'توصيل', delivery_apps: 'تطبيقات التوصيل',
-  hungerstation: 'هنقرستيشن', jahez: 'جاهز', toyou: 'تويو', mrsool: 'مرسول', keeta: 'كيتا',
+  dine_in: 'صالة', hall: 'صالة', takeaway: 'استلام',
   coupons: 'كوبونات', discounts: 'خصومات', cancellations: 'إلغاءات'
 };
 const mixLabel = (k) => MIX_LABELS[String(k).split(':').pop()] || String(k).split(':').pop();
