@@ -133,8 +133,7 @@ router.get('/:date/print', requireAuth, (req, res) => {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>التقرير اليومي — نملية — ${esc(date)}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/fonts.css">
 <style>
   :root{
     --ink:#1a1410;--ink-soft:#3a2f25;--bottle:#1F3A2E;--bottle-deep:#14271F;
