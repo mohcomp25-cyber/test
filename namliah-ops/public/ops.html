@@ -1,0 +1,99 @@
+<!doctype html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مدير التشغيل — منصة عمليات نملية</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Amiri:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/brand.css">
+<link rel="icon" href="/img/logo.svg">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">نملية</div>
+  <div class="page-title">لوحة مدير التشغيل — التقرير اليومي</div>
+  <div class="spacer"></div>
+  <span class="user" id="userName"></span>
+  <button class="btn-logout" id="logoutBtn">تسجيل الخروج</button>
+</header>
+
+<main class="container">
+  <!-- شريط التاريخ والحالة -->
+  <div class="card" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <label class="field-label" for="dateSelect" style="margin:0">يوم التقرير:</label>
+    <select class="select" id="dateSelect" style="width:auto;min-width:180px"></select>
+    <span id="statusBadge"></span>
+    <div class="spacer" style="flex:1"></div>
+    <span class="muted" id="receivedAt"></span>
+  </div>
+
+  <div id="reportArea" style="display:none;flex-direction:column;gap:22px">
+    <!-- KPIs -->
+    <section class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">إجمالي المبيعات</div><div class="kpi-value" id="kpiSales"></div></div>
+      <div class="kpi-card"><div class="kpi-label">عدد الطلبات</div><div class="kpi-value" id="kpiOrders"></div></div>
+      <div class="kpi-card"><div class="kpi-label">متوسط الفاتورة</div><div class="kpi-value" id="kpiAvg"></div></div>
+      <div class="kpi-card"><div class="kpi-label">تقييم قوقل ماب</div><div class="kpi-value" id="kpiRating"><small>—</small></div><div class="kpi-sub" id="kpiRatingSub"></div></div>
+    </section>
+
+    <!-- المزيج -->
+    <section class="mix-grid">
+      <div class="card">
+        <h3 class="section-title" style="margin-bottom:12px">طرق الدفع</h3>
+        <div class="mix-list" id="paymentMix"></div>
+      </div>
+      <div class="card">
+        <h3 class="section-title" style="margin-bottom:12px">قنوات البيع</h3>
+        <div class="mix-list" id="channelMix"></div>
+      </div>
+    </section>
+
+    <!-- تفاصيل المبيعات -->
+    <section>
+      <h2 class="section-title" style="margin-bottom:12px">تفاصيل المبيعات <small id="linesCount"></small></h2>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>#</th><th>الصنف</th><th>التصنيف</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead>
+          <tbody id="linesBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- الملاحظات التشغيلية -->
+    <section class="card">
+      <h2 class="section-title" style="margin-bottom:12px">الملاحظات التشغيلية</h2>
+      <textarea class="input" id="noteBody" placeholder="اكتب ملاحظاتك التشغيلية عن هذا اليوم (الأحداث، الشكاوى، الصيانة، الموظفون…)"></textarea>
+      <div style="display:flex;justify-content:flex-end;margin-top:10px">
+        <button class="btn btn--olive btn--sm" id="saveNoteBtn">حفظ الملاحظات</button>
+      </div>
+    </section>
+
+    <!-- مراجعات قوقل ماب -->
+    <section>
+      <h2 class="section-title" style="margin-bottom:12px">
+        أحدث مراجعات قوقل ماب
+        <small id="reviewsMeta"></small>
+        <button class="btn btn--outline btn--sm" id="syncReviewsBtn" style="margin-inline-start:auto">↻ مزامنة الآن</button>
+      </h2>
+      <div class="reviews-grid" id="reviewsStrip"></div>
+    </section>
+
+    <!-- شريط الإجراءات -->
+    <div class="actions-bar">
+      <a class="btn btn--outline" id="exportBtn" target="_blank">🖨 تصدير / طباعة</a>
+      <button class="btn btn--gold" id="approveBtn">✔ اعتماد التقرير ونشره للإدارة</button>
+    </div>
+  </div>
+
+  <div id="emptyState" class="empty-state" style="display:none">
+    <div class="icon">📭</div>
+    <h3>لم تصل بيانات مبيعات بعد</h3>
+    <p class="muted">بمجرد أن يرسل الوورك فلو بيانات اليومية ستظهر هنا تلقائياً.</p>
+  </div>
+</main>
+
+<script src="/js/api.js"></script>
+<script src="/js/ops.js"></script>
+</body>
+</html>

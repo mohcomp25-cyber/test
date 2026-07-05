@@ -1,0 +1,22 @@
+{
+  "name": "namliah-ops",
+  "version": "1.0.0",
+  "description": "منصة عمليات نملية — التقارير اليومية لمدير التشغيل وداشبورد الإدارة",
+  "main": "server.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node scripts/seed.js",
+    "wipe-demo": "node scripts/wipe-demo.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "node-cron": "^3.0.3"
+  }
+}

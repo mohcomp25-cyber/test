@@ -1,0 +1,137 @@
+'use strict';
+const { db, getSetting, setSetting, audit } = require('./../db');
+
+const APIFY_BASE = 'https://api.apify.com/v2';
+const POLL_INTERVAL_MS = 10 * 1000;
+const RUN_TIMEOUT_MS = 8 * 60 * 1000;
+
+function isConfigured() {
+  return Boolean(process.env.APIFY_TOKEN && process.env.GOOGLE_MAPS_URL);
+}
+
+function sentimentFor(rating) {
+  if (rating >= 4) return 'positive';
+  if (rating <= 2) return 'negative';
+  return 'neutral';
+}
+
+function actorId() {
+  // e.g. compass~google-maps-reviews-scraper (Apify uses ~ instead of / in URLs)
+  return (process.env.APIFY_ACTOR || 'compass~google-maps-reviews-scraper').replace('/', '~');
+}
+
+async function apifyFetch(pathname, options) {
+  const url = `${APIFY_BASE}${pathname}${pathname.includes('?') ? '&' : '?'}token=${process.env.APIFY_TOKEN}`;
+  const res = await fetch(url, options);
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Apify ${res.status}: ${body.slice(0, 300)}`);
+  }
+  return res.json();
+}
+
+async function startRun() {
+  const input = {
+    startUrls: [{ url: process.env.GOOGLE_MAPS_URL }],
+    maxReviews: Number(process.env.APIFY_MAX_REVIEWS || 200),
+    reviewsSort: 'newest',
+    language: 'ar',
+    personalData: true
+  };
+  const data = await apifyFetch(`/acts/${actorId()}/runs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input)
+  });
+  return data.data; // { id, defaultDatasetId, status, ... }
+}
+
+async function waitForRun(runId) {
+  const deadline = Date.now() + RUN_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const data = await apifyFetch(`/actor-runs/${runId}`);
+    const run = data.data;
+    if (run.status === 'SUCCEEDED') return run;
+    if (['FAILED', 'ABORTED', 'TIMED-OUT'].includes(run.status)) {
+      throw new Error(`Apify run ${run.status}`);
+    }
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+  }
+  throw new Error('Apify run timed out');
+}
+
+async function fetchDataset(datasetId) {
+  return apifyFetch(`/datasets/${datasetId}/items?clean=true&format=json`);
+}
+
+const upsertReview = db.prepare(`
+  INSERT INTO reviews (external_id, author_name, author_photo_url, rating, text, review_date, photos, owner_reply, sentiment, fetched_at, is_demo)
+  VALUES (@external_id, @author_name, @author_photo_url, @rating, @text, @review_date, @photos, @owner_reply, @sentiment, datetime('now'), 0)
+  ON CONFLICT(external_id) DO UPDATE SET
+    rating = excluded.rating,
+    text = excluded.text,
+    photos = excluded.photos,
+    owner_reply = excluded.owner_reply,
+    sentiment = excluded.sentiment,
+    fetched_at = excluded.fetched_at
+`);
+
+function mapItem(item) {
+  const rating = Math.max(1, Math.min(5, Math.round(Number(item.stars ?? item.rating ?? 0)) || 0));
+  if (!rating) return null;
+  const externalId = item.reviewId || item.id;
+  if (!externalId) return null;
+  const photos = Array.isArray(item.reviewImageUrls) ? item.reviewImageUrls
+    : Array.isArray(item.images) ? item.images : [];
+  return {
+    external_id: String(externalId),
+    author_name: item.name || item.reviewerName || null,
+    author_photo_url: item.reviewerPhotoUrl || item.userPhotoUrl || null,
+    rating,
+    text: item.text || item.textTranslated || null,
+    review_date: item.publishedAtDate ? String(item.publishedAtDate).slice(0, 10) : null,
+    photos: JSON.stringify(photos),
+    owner_reply: item.responseFromOwnerText || null,
+    sentiment: sentimentFor(rating)
+  };
+}
+
+const saveAllTx = db.transaction((rows) => {
+  let saved = 0;
+  for (const row of rows) {
+    upsertReview.run(row);
+    saved++;
+  }
+  return saved;
+});
+
+async function syncReviews(triggeredBy) {
+  if (!isConfigured()) {
+    setSetting('last_reviews_sync_status', 'not_configured');
+    return { status: 'not_configured' };
+  }
+  if (getSetting('reviews_sync_running') === '1') {
+    return { status: 'already_running' };
+  }
+  setSetting('reviews_sync_running', '1');
+  try {
+    const run = await startRun();
+    const finished = await waitForRun(run.id);
+    const items = await fetchDataset(finished.defaultDatasetId);
+    const rows = (Array.isArray(items) ? items : []).map(mapItem).filter(Boolean);
+    const saved = saveAllTx(rows);
+    setSetting('last_reviews_sync_at', new Date().toISOString());
+    setSetting('last_reviews_sync_status', 'ok');
+    audit('reviews_synced', triggeredBy || null, { fetched: rows.length, saved });
+    return { status: 'ok', saved };
+  } catch (err) {
+    setSetting('last_reviews_sync_at', new Date().toISOString());
+    setSetting('last_reviews_sync_status', `error: ${err.message}`);
+    audit('reviews_sync_failed', triggeredBy || null, { error: err.message });
+    return { status: 'error', message: err.message };
+  } finally {
+    setSetting('reviews_sync_running', '0');
+  }
+}
+
+module.exports = { isConfigured, syncReviews, sentimentFor };

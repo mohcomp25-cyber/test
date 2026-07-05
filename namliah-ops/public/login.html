@@ -1,0 +1,56 @@
+<!doctype html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>تسجيل الدخول — منصة عمليات نملية</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Amiri:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/brand.css">
+<link rel="icon" href="/img/logo.svg">
+</head>
+<body class="login-body">
+  <form class="login-card" id="loginForm">
+    <div class="login-brand">
+      <div class="wordmark">نملية</div>
+      <div class="tagline">منصة العمليات — التقارير اليومية وتحليل الأداء</div>
+    </div>
+    <div class="login-error" id="loginError"></div>
+    <div>
+      <label class="field-label" for="username">اسم المستخدم</label>
+      <input class="input" id="username" name="username" autocomplete="username" required>
+    </div>
+    <div>
+      <label class="field-label" for="password">كلمة المرور</label>
+      <input class="input" id="password" name="password" type="password" autocomplete="current-password" required>
+    </div>
+    <button class="btn btn--gold" type="submit" id="loginBtn">تسجيل الدخول</button>
+  </form>
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('loginBtn');
+  const err = document.getElementById('loginError');
+  btn.disabled = true;
+  err.classList.remove('show');
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: document.getElementById('username').value,
+        password: document.getElementById('password').value
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'بيانات الدخول غير صحيحة');
+    location.href = data.role === 'admin' ? '/dashboard' : '/ops';
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.classList.add('show');
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
