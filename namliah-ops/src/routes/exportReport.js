@@ -2,7 +2,7 @@
 const express = require('express');
 const { requireAuth } = require('../auth');
 const reports = require('../services/reports');
-const { db } = require('../db');
+const { db, getSetting } = require('../db');
 
 const router = express.Router();
 
@@ -18,9 +18,18 @@ const money = (n) => `${fmt.format(n || 0)} ر.س`;
 const LABELS = {
   cash: 'نقدي', card: 'شبكة/بطاقة', online: 'دفع إلكتروني', other: 'أخرى',
   dine_in: 'صالة', takeaway: 'استلام', delivery: 'توصيل', delivery_apps: 'تطبيقات التوصيل',
-  hungerstation: 'هنقرستيشن', jahez: 'جاهز', toyou: 'تويو', mrsool: 'مرسول', keeta: 'كيتا'
+  hungerstation: 'هنقرستيشن', jahez: 'جاهز', toyou: 'تويو', mrsool: 'مرسول', keeta: 'كيتا',
+  coupons: 'كوبونات', discounts: 'خصومات', cancellations: 'إلغاءات'
 };
 const label = (k) => LABELS[k.split(':').pop()] || k.split(':').pop();
+
+const NOTE_LABELS = {
+  customers: 'ملاحظات الزبائن وحلولها',
+  operations: 'ملاحظات تشغيلية',
+  kitchen: 'ملاحظات المطبخ',
+  maintenance: 'ملاحظات الصيانة',
+  general: 'ملاحظات عامة'
+};
 
 function flatMix(obj, prefix) {
   const out = {};
@@ -31,17 +40,38 @@ function flatMix(obj, prefix) {
   return out;
 }
 
-function mixRows(mix) {
+function mixRows(mix, { withTotal = false, totalLabel = 'الإجمالي' } = {}) {
   const entries = Object.entries(flatMix(mix)).sort((a, b) => b[1] - a[1]);
   if (!entries.length) return '<p class="muted">لا توجد بيانات</p>';
   const sum = entries.reduce((a, [, v]) => a + v, 0) || 1;
-  return entries.map(([k, v]) =>
-    `<div class="mix-row"><span>${esc(label(k))}</span><b>${money(v)}</b><span class="muted">${fmt.format((v / sum) * 100)}٪</span></div>`
+  const rows = entries.map(([k, v]) =>
+    `<div class="mix-row"><span>${esc(label(k))}</span><b>${money(v)}</b><span class="muted pct">${fmt.format((v / sum) * 100)}٪</span></div>`
   ).join('');
+  const total = withTotal
+    ? `<div class="mix-row mix-total-row"><span>${totalLabel}</span><b>${money(sum)}</b><span class="pct"></span></div>` : '';
+  return rows + total;
 }
 
 const STAR = '★';
 const stars = (r) => `<span class="stars">${STAR.repeat(r)}<span class="stars-off">${STAR.repeat(5 - r)}</span></span>`;
+
+function linesTable(title, rows, headColor) {
+  const body = rows.map((l, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${esc(l.product_name)}</td>
+      <td class="num">${fmt.format(l.qty)}</td>
+      <td class="num">${money(l.total)}</td>
+    </tr>`).join('') || '<tr><td colspan="4" class="muted">—</td></tr>';
+  return `
+    <table>
+      <thead>
+        <tr><th colspan="4" style="text-align:center;background:${headColor}">${title}</th></tr>
+        <tr><th>#</th><th>الصنف</th><th>الكمية</th><th>الإجمالي</th></tr>
+      </thead>
+      <tbody>${body}</tbody>
+    </table>`;
+}
 
 router.get('/:date/print', requireAuth, (req, res) => {
   const { date } = req.params;
@@ -56,23 +86,34 @@ router.get('/:date/print', requireAuth, (req, res) => {
   `).all();
   const reviewStats = db.prepare('SELECT COUNT(*) AS count, AVG(rating) AS avg FROM reviews').get();
 
-  const linesRows = report.lines.map((l, i) => `
-    <tr>
-      <td>${i + 1}</td>
-      <td>${esc(l.product_name)}</td>
-      <td>${esc(l.category || '—')}</td>
-      <td class="num">${fmt.format(l.qty)}</td>
-      <td class="num">${money(l.unit_price)}</td>
-      <td class="num">${money(l.total)}</td>
-    </tr>`).join('');
+  // مبيعات الصالة حسب الويتر
+  const hall = [...(report.hall_sales || [])].sort((a, b) => b.total - a.total);
+  const hallTotal = hall.reduce((a, w) => a + (w.total || 0), 0);
+  const waitersRows = hall.map((w) => `
+    <tr><td>${esc(w.waiter)}</td><td class="num">${money(w.total)}</td>
+    <td class="num">${hallTotal ? fmt.format((w.total / hallTotal) * 100) : 0}%</td></tr>`).join('');
 
-  const notesHtml = report.notes.length
-    ? report.notes.map((n) => `
-        <div class="note">
-          <div class="note-head"><b>${esc(n.author)}</b><span class="muted">${esc(n.updated_at)}</span></div>
-          <p>${esc(n.body).replace(/\n/g, '<br>')}</p>
-        </div>`).join('')
-    : '<p class="muted">لا توجد ملاحظات تشغيلية لهذا اليوم</p>';
+  const tablesCount = Number(getSetting('tables_count')) || null;
+  const tableAvg = tablesCount && hallTotal > 0 ? hallTotal / tablesCount : null;
+
+  const d = report.deductions || {};
+  const deductionsLine = [
+    ['كوبونات', d.coupons], ['خصومات', d.discounts], ['إلغاءات', d.cancellations]
+  ].map(([l, v]) => `${l}: <b>${money(v || 0)}</b>`).join(' · ');
+
+  const lines = report.lines || [];
+  const topLines = lines.slice(0, 10);
+  const bottomLines = lines.length > 10 ? lines.slice(-5).reverse() : [];
+
+  const notesByCat = {};
+  (report.notes || []).forEach((n) => { notesByCat[n.category] = n; });
+  const notesHtml = Object.entries(NOTE_LABELS)
+    .filter(([cat]) => notesByCat[cat])
+    .map(([cat, catLabel]) => `
+      <div class="note">
+        <div class="note-head"><b>${catLabel}</b><span class="muted">${esc(notesByCat[cat].updated_at)}</span></div>
+        <p>${esc(notesByCat[cat].body).replace(/\n/g, '<br>')}</p>
+      </div>`).join('') || '<p class="muted">لا توجد ملاحظات لهذا اليوم</p>';
 
   const reviewsHtml = latestReviews.length
     ? latestReviews.map((r) => `
@@ -83,7 +124,7 @@ router.get('/:date/print', requireAuth, (req, res) => {
     : '<p class="muted">لا توجد مراجعات محفوظة بعد</p>';
 
   const approvalStamp = report.status === 'approved'
-    ? `<div class="stamp approved">✔ تقرير معتمد<small>اعتُمد بواسطة ${esc(report.approved_by_name || '—')} — ${esc(report.approved_at || '')}</small></div>`
+    ? `<div class="stamp approved">تقرير معتمد<small>اعتُمد بواسطة ${esc(report.approved_by_name || '—')} · ${esc(report.approved_at || '')}</small></div>`
     : '<div class="stamp pending">تقرير غير معتمد بعد</div>';
 
   res.send(`<!doctype html>
@@ -93,41 +134,56 @@ router.get('/:date/print', requireAuth, (req, res) => {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>التقرير اليومي — نملية — ${esc(date)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Amiri:wght@700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
-  :root{--olive:#1F2A1A;--olive2:#3B4A2A;--gold:#C9A24B;--beige:#F5EFE3;--cream:#FBF8F1;--ink:#2B2B23;}
+  :root{
+    --ink:#1a1410;--ink-soft:#3a2f25;--bottle:#1F3A2E;--bottle-deep:#14271F;
+    --parchment:#F1E6CF;--paper:#FBF6EB;--bone:#F6EEDD;--parch2:#E8D9BB;
+    --brass:#B89253;--brass-deep:#8C6A35;--brass-light:#D7B47A;
+    --success:#4F7A4C;--error:#9A3A1E;--terracotta:#B5612C;
+    --line:rgba(26,20,16,.14);--line-soft:rgba(26,20,16,.07);
+  }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Cairo',sans-serif;color:var(--ink);background:var(--beige);padding:24px;font-size:14px}
-  .sheet{max-width:800px;margin:0 auto;background:var(--cream);border:1px solid #E3D9C2;border-radius:12px;overflow:hidden}
-  header{background:linear-gradient(135deg,var(--olive),var(--olive2));color:var(--beige);padding:28px 32px;display:flex;justify-content:space-between;align-items:center;gap:16px}
-  header .brand{font-family:'Amiri',serif;font-size:34px;color:var(--gold)}
-  header .sub{opacity:.85;font-size:13px}
-  header .date{font-size:20px;font-weight:700}
-  .gold-line{height:3px;background:linear-gradient(90deg,var(--gold),#E3C77E,var(--gold))}
-  main{padding:28px 32px}
-  h2{font-size:16px;color:var(--olive2);border-inline-start:4px solid var(--gold);padding-inline-start:10px;margin:26px 0 12px}
-  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-  .kpi{background:#fff;border:1px solid #EAE2CE;border-radius:10px;padding:14px 16px}
-  .kpi .lbl{font-size:12px;color:#6B6B58}
-  .kpi .val{font-size:22px;font-weight:700;color:var(--olive)}
-  .mixes{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-  .mix-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px dashed #E3D9C2}
-  table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden}
-  th{background:var(--olive2);color:var(--beige);padding:8px 10px;font-size:12px;text-align:right}
-  td{padding:7px 10px;border-bottom:1px solid #F0EADA}
-  tr:nth-child(even) td{background:#FAF6EC}
+  body{font-family:'Tajawal',sans-serif;color:var(--ink);background:var(--parchment);padding:24px;font-size:13.5px;line-height:1.8}
+  .sheet{max-width:820px;margin:0 auto;background:var(--paper);border:1px solid var(--line-soft);border-radius:14px;overflow:hidden}
+  header{background:linear-gradient(160deg,var(--bottle-deep),var(--bottle));color:var(--parchment);padding:26px 32px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+  header img{height:64px;display:block}
+  header .sub{opacity:.85;font-size:12.5px}
+  header .date{font-family:'Amiri',serif;font-size:26px;font-weight:700;color:var(--brass-light)}
+  .brass-line{height:2px;background:linear-gradient(90deg,var(--brass),var(--brass-light),var(--brass))}
+  main{padding:26px 32px}
+  h2{font-family:'Amiri',serif;font-size:19px;color:var(--bottle);margin:24px 0 10px;display:flex;align-items:center;gap:10px}
+  h2::before{content:'';width:24px;height:2px;background:var(--brass);flex:none}
+  h2 small{font-family:'Tajawal',sans-serif;font-size:11.5px;color:var(--ink-soft);font-weight:400}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .kpi{background:#fff;border:1px solid var(--line-soft);border-radius:10px;padding:10px 14px}
+  .kpi .lbl{font-size:11.5px;color:var(--ink-soft)}
+  .kpi .val{font-size:19px;font-weight:800;color:var(--bottle);font-variant-numeric:tabular-nums}
+  .deductions{background:var(--bone);border:1px dashed var(--brass);border-radius:10px;padding:7px 14px;margin-top:10px;font-size:12.5px;color:var(--ink-soft)}
+  .deductions b{color:var(--ink);font-variant-numeric:tabular-nums}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .mix-row{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed var(--line-soft)}
+  .mix-row .pct{min-width:44px;text-align:left;direction:ltr}
+  .mix-total-row{border-bottom:0;border-top:1.5px solid var(--brass);font-weight:800;color:var(--bottle)}
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;font-size:12.5px}
+  th{background:var(--bottle);color:var(--parchment);padding:6px 10px;font-size:11.5px;text-align:right}
+  td{padding:5px 10px;border-bottom:1px solid var(--line-soft)}
+  tr:nth-child(even) td{background:var(--bone)}
+  tfoot td{background:var(--parch2);font-weight:800;color:var(--bottle);border-top:1px solid var(--brass)}
   .num{font-variant-numeric:tabular-nums;text-align:left;direction:ltr}
-  .note,.review{background:#fff;border:1px solid #EAE2CE;border-radius:10px;padding:12px 14px;margin-bottom:10px}
-  .note-head{display:flex;gap:10px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
-  .muted{color:#8A8A72;font-size:12px}
-  .stars{color:var(--gold);letter-spacing:2px}
-  .stars-off{color:#DDD4BC}
-  .stamp{margin-top:26px;border:2px solid;border-radius:12px;padding:14px 18px;display:inline-flex;flex-direction:column;gap:4px;font-weight:700}
-  .stamp.approved{border-color:#4E7A3A;color:#4E7A3A;transform:rotate(-1.5deg)}
-  .stamp.pending{border-color:#A94438;color:#A94438}
-  .stamp small{font-weight:400;font-size:12px}
-  footer{padding:16px 32px;color:#8A8A72;font-size:12px;display:flex;justify-content:space-between;border-top:1px solid #EAE2CE}
-  .print-btn{position:fixed;bottom:24px;inset-inline-start:24px;background:var(--gold);color:var(--olive);border:0;border-radius:999px;padding:14px 26px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+  .note,.review{background:#fff;border:1px solid var(--line-soft);border-radius:10px;padding:10px 14px;margin-bottom:8px}
+  .note-head{display:flex;gap:10px;align-items:center;margin-bottom:4px;flex-wrap:wrap}
+  .note-head b{color:var(--bottle)}
+  .muted{color:var(--ink-soft);opacity:.75;font-size:11.5px}
+  .stars{color:var(--brass-deep);letter-spacing:2px}
+  .stars-off{color:var(--parch2)}
+  .stamp{margin-top:24px;border:2px solid;border-radius:12px;padding:12px 18px;display:inline-flex;flex-direction:column;gap:2px;font-weight:800;font-family:'Amiri',serif;font-size:17px}
+  .stamp.approved{border-color:var(--success);color:var(--success);transform:rotate(-1.5deg)}
+  .stamp.pending{border-color:var(--error);color:var(--error)}
+  .stamp small{font-family:'Tajawal',sans-serif;font-weight:400;font-size:11.5px}
+  footer{padding:14px 32px;color:var(--ink-soft);font-size:11.5px;display:flex;justify-content:space-between;border-top:1px solid var(--line-soft);flex-wrap:wrap;gap:6px}
+  .print-btn{position:fixed;bottom:22px;inset-inline-start:22px;background:linear-gradient(180deg,var(--brass),var(--brass-deep));color:var(--paper);border:0;border-radius:999px;padding:13px 26px;font-family:inherit;font-size:14.5px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(26,20,16,.3)}
+  @media (max-width:640px){.cols{grid-template-columns:1fr}header{padding:18px 20px}main{padding:18px 20px}}
   @media print{
     body{background:#fff;padding:0}
     .sheet{border:0;border-radius:0;max-width:none}
@@ -140,45 +196,59 @@ router.get('/:date/print', requireAuth, (req, res) => {
 <div class="sheet">
   <header>
     <div>
-      <div class="brand">نملية</div>
-      <div class="sub">التقرير التشغيلي اليومي — فرع جدة</div>
+      <img src="/img/logo-cream.png" alt="نملية — مطعم من الريف اللبناني">
+      <div class="sub">التقرير التشغيلي اليومي · فرع جدة</div>
     </div>
     <div class="date">${esc(date)}</div>
   </header>
-  <div class="gold-line"></div>
+  <div class="brass-line"></div>
   <main>
     <div class="kpis">
       <div class="kpi"><div class="lbl">إجمالي المبيعات</div><div class="val">${money(report.total_sales)}</div></div>
       <div class="kpi"><div class="lbl">عدد الطلبات</div><div class="val">${fmt.format(report.orders_count)}</div></div>
       <div class="kpi"><div class="lbl">متوسط الفاتورة</div><div class="val">${money(report.avg_ticket)}</div></div>
+      <div class="kpi"><div class="lbl">متوسط مبيعات الطاولة</div><div class="val">${tableAvg ? money(tableAvg) : '—'}</div></div>
+    </div>
+    <div class="deductions">${deductionsLine}${tablesCount ? ` · عدد الطاولات: <b>${fmt.format(tablesCount)}</b>` : ''}</div>
+
+    <h2>توزيع المبيعات</h2>
+    <div class="cols">
+      <div>
+        <table>
+          <thead><tr><th colspan="3" style="text-align:center">مبيعات الصالة حسب الويتر</th></tr>
+          <tr><th>الويتر</th><th>المبيعات</th><th>النسبة</th></tr></thead>
+          <tbody>${waitersRows || '<tr><td colspan="3" class="muted">لا توجد بيانات</td></tr>'}</tbody>
+          ${hallTotal ? `<tfoot><tr><td>إجمالي الصالة</td><td class="num">${money(hallTotal)}</td><td class="num">100%</td></tr></tfoot>` : ''}
+        </table>
+      </div>
+      <div>
+        <h3 class="muted" style="margin-bottom:4px">الطلبات الخارجية</h3>
+        ${mixRows(report.external_sales, { withTotal: true, totalLabel: 'إجمالي الخارجي' })}
+        <h3 class="muted" style="margin:12px 0 4px">طرق الدفع</h3>
+        ${mixRows(report.payment_breakdown)}
+      </div>
     </div>
 
-    <h2>مزيج المبيعات</h2>
-    <div class="mixes">
-      <div><h3 class="muted">طرق الدفع</h3>${mixRows(report.payment_breakdown)}</div>
-      <div><h3 class="muted">قنوات البيع</h3>${mixRows(report.channel_breakdown)}</div>
+    <h2>تفاصيل المبيعات <small>${fmt.format(lines.length)} صنف إجمالاً</small></h2>
+    <div class="cols">
+      <div>${linesTable('الأكثر مبيعاً — ١٠ أصناف', topLines, 'var(--bottle-deep)')}</div>
+      <div>${linesTable('الأقل مبيعاً — ٥ أصناف', bottomLines, 'var(--terracotta)')}</div>
     </div>
 
-    <h2>تفاصيل المبيعات (${fmt.format(report.lines.length)} صنف)</h2>
-    <table>
-      <thead><tr><th>#</th><th>الصنف</th><th>التصنيف</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead>
-      <tbody>${linesRows || '<tr><td colspan="6" class="muted">لا توجد تفاصيل</td></tr>'}</tbody>
-    </table>
-
-    <h2>الملاحظات التشغيلية</h2>
+    <h2>الملاحظات اليومية</h2>
     ${notesHtml}
 
-    <h2>مراجعات قوقل ماب${reviewStats.count ? ` — المتوسط ${fmt.format(reviewStats.avg)} من ٥ (${fmt.format(reviewStats.count)} مراجعة)` : ''}</h2>
+    <h2>مراجعات قوقل ماب${reviewStats.count ? ` <small>المتوسط ${fmt.format(reviewStats.avg)} من ٥ · ${fmt.format(reviewStats.count)} مراجعة</small>` : ''}</h2>
     ${reviewsHtml}
 
     ${approvalStamp}
   </main>
   <footer>
-    <span>منصة عمليات نملية</span>
+    <span>نملية · مطعم من الريف اللبناني — منصة العمليات</span>
     <span>أُنشئ في ${esc(new Date().toISOString().slice(0, 16).replace('T', ' '))} UTC</span>
   </footer>
 </div>
-<button class="print-btn" onclick="window.print()">🖨 طباعة / حفظ PDF</button>
+<button class="print-btn" onclick="window.print()">طباعة / حفظ PDF</button>
 </body>
 </html>`);
 });

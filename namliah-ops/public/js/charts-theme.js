@@ -3,12 +3,12 @@
 
 (function () {
   if (typeof Chart === 'undefined') return;
-  const SURFACE = '#FBF8F1';
-  const INK = '#2B2B23';
-  const INK_MUTED = '#8A8A72';
-  const GRID = '#EAE2CE';
+  const SURFACE = '#FBF6EB';
+  const INK = '#1a1410';
+  const INK_MUTED = '#3a2f25';
+  const GRID = 'rgba(26, 20, 16, 0.09)';
 
-  Chart.defaults.font.family = "'Cairo', 'Segoe UI', sans-serif";
+  Chart.defaults.font.family = "'Tajawal', 'Cairo', sans-serif";
   Chart.defaults.font.size = 12;
   Chart.defaults.color = INK_MUTED;
 
@@ -21,9 +21,9 @@
 
   Chart.defaults.plugins.tooltip.rtl = true;
   Chart.defaults.plugins.tooltip.textDirection = 'rtl';
-  Chart.defaults.plugins.tooltip.backgroundColor = '#1F2A1A';
-  Chart.defaults.plugins.tooltip.titleColor = '#E3C77E';
-  Chart.defaults.plugins.tooltip.bodyColor = '#F5EFE3';
+  Chart.defaults.plugins.tooltip.backgroundColor = '#14271F';
+  Chart.defaults.plugins.tooltip.titleColor = '#D7B47A';
+  Chart.defaults.plugins.tooltip.bodyColor = '#F1E6CF';
   Chart.defaults.plugins.tooltip.padding = 10;
   Chart.defaults.plugins.tooltip.cornerRadius = 8;
   Chart.defaults.plugins.tooltip.displayColors = true;

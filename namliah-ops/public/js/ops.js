@@ -1,25 +1,78 @@
 'use strict';
 // منطق صفحة مدير التشغيل
 
+const NOTE_CATS = ['customers', 'operations', 'kitchen', 'maintenance', 'general'];
+
 let currentDate = null;
 let currentStatus = null;
 let isAdminViewer = false;
+let tablesCount = null;
+let currentHallTotal = 0;
 
 async function loadDates() {
   const dates = await api('/api/ops/dates');
   const select = document.getElementById('dateSelect');
   select.innerHTML = dates.map((d) =>
-    `<option value="${d.report_date}">${d.report_date} ${d.status === 'approved' ? '✔' : '•'}</option>`
+    `<option value="${d.report_date}">${d.report_date} ${d.status === 'approved' ? '✓' : '•'}</option>`
   ).join('');
   return dates;
 }
 
+async function loadTables() {
+  const s = await api('/api/ops/settings');
+  tablesCount = s.tables_count;
+  if (tablesCount) document.getElementById('tablesCount').value = tablesCount;
+}
+
 function setLocked(locked) {
-  document.getElementById('noteBody').disabled = locked;
+  NOTE_CATS.forEach((c) => { document.getElementById(`note-${c}`).disabled = locked; });
   document.getElementById('saveNoteBtn').disabled = locked;
   const approveBtn = document.getElementById('approveBtn');
   approveBtn.disabled = locked;
-  approveBtn.textContent = locked ? '✔ التقرير معتمد ومنشور للإدارة' : '✔ اعتماد التقرير ونشره للإدارة';
+  approveBtn.textContent = locked ? 'التقرير معتمد ومنشور للإدارة' : 'اعتماد التقرير ونشره للإدارة';
+}
+
+function renderTableAvg() {
+  const el = document.getElementById('kpiTableAvg');
+  const sub = document.getElementById('kpiTableSub');
+  if (tablesCount && currentHallTotal > 0) {
+    el.textContent = money(currentHallTotal / tablesCount);
+    sub.textContent = `مبيعات الصالة ÷ ${nf0.format(tablesCount)} طاولة`;
+  } else {
+    el.innerHTML = '<small>حدد عدد الطاولات أعلاه</small>';
+    sub.textContent = '';
+  }
+}
+
+function renderWaiters(hallSales) {
+  const body = document.getElementById('waitersBody');
+  const foot = document.getElementById('waitersFoot');
+  const total = hallSales.reduce((a, w) => a + (w.total || 0), 0);
+  currentHallTotal = total;
+  if (!hallSales.length) {
+    body.innerHTML = '<tr><td colspan="3" class="muted" style="text-align:center;padding:18px">لم تصل بيانات الويترز بعد من الوورك فلو</td></tr>';
+    foot.innerHTML = '';
+    return;
+  }
+  const sorted = [...hallSales].sort((a, b) => b.total - a.total);
+  body.innerHTML = sorted.map((w) => `
+    <tr>
+      <td>${esc(w.waiter)}</td>
+      <td class="num">${money(w.total)}</td>
+      <td class="num">${total ? nf.format((w.total / total) * 100) : 0}%</td>
+    </tr>`).join('');
+  foot.innerHTML = `<tr><td>إجمالي الصالة</td><td class="num">${money(total)}</td><td class="num">100%</td></tr>`;
+}
+
+function renderExternal(mix) {
+  renderMixList(document.getElementById('externalMix'), mix);
+  const total = Object.values(flattenMix(mix)).reduce((a, v) => a + v, 0);
+  document.getElementById('externalTotal').innerHTML = total
+    ? `<span>إجمالي الطلبات الخارجية</span><span class="num">${money(total)}</span>` : '';
+}
+
+function linesRow(l, i) {
+  return `<tr><td>${i + 1}</td><td>${esc(l.product_name)}</td><td class="num">${nf.format(l.qty)}</td><td class="num">${money(l.total)}</td></tr>`;
 }
 
 async function loadReport(date) {
@@ -43,33 +96,50 @@ async function loadReport(date) {
 
   const badge = document.getElementById('statusBadge');
   badge.className = `badge badge--${report.status}`;
-  badge.textContent = report.status === 'approved' ? '✔ معتمد ومنشور' : '⏳ بانتظار الاعتماد';
+  badge.textContent = report.status === 'approved' ? 'معتمد ومنشور' : 'بانتظار الاعتماد';
   document.getElementById('receivedAt').textContent =
-    `آخر استلام من الوورك فلو: ${report.received_at}${report.is_demo ? ' (بيانات تجريبية)' : ''}`;
+    `آخر استلام: ${report.received_at}${report.is_demo ? ' (بيانات تجريبية)' : ''}`;
 
+  // المؤشرات
   document.getElementById('kpiSales').textContent = money(report.total_sales);
+  const d = report.deductions || {};
+  const dedParts = [
+    ['كوبونات', d.coupons], ['خصومات', d.discounts], ['إلغاءات', d.cancellations]
+  ].map(([label, v]) => `<span>${label}: <b>${money(v || 0)}</b></span>`);
+  document.getElementById('kpiDeductions').innerHTML = dedParts.join('');
   document.getElementById('kpiOrders').textContent = nf0.format(report.orders_count);
   document.getElementById('kpiAvg').textContent = money(report.avg_ticket);
 
-  renderMixList(document.getElementById('paymentMix'), report.payment_breakdown);
-  renderMixList(document.getElementById('channelMix'), report.channel_breakdown);
+  // طرق الدفع المصغّرة + توزيع المبيعات
+  renderChips(document.getElementById('paymentChips'), report.payment_breakdown);
+  renderWaiters(report.hall_sales || []);
+  renderExternal(report.external_sales || {});
+  renderTableAvg();
 
-  document.getElementById('linesCount').textContent = `${nf0.format(report.lines.length)} صنف`;
-  document.getElementById('linesBody').innerHTML = report.lines.map((l, i) => `
-    <tr>
-      <td>${i + 1}</td>
-      <td>${esc(l.product_name)}</td>
-      <td>${esc(l.category || '—')}</td>
-      <td class="num">${nf.format(l.qty)}</td>
-      <td class="num">${money(l.unit_price)}</td>
-      <td class="num">${money(l.total)}</td>
-    </tr>`).join('') || '<tr><td colspan="6" class="muted">لا توجد تفاصيل</td></tr>';
+  // الأكثر والأقل مبيعاً (السطور تصل مرتبة تنازلياً بالإجمالي)
+  const lines = report.lines || [];
+  document.getElementById('linesCount').textContent = `${nf0.format(lines.length)} صنف إجمالاً`;
+  document.getElementById('topLinesBody').innerHTML =
+    lines.slice(0, 10).map(linesRow).join('') ||
+    '<tr><td colspan="4" class="muted" style="text-align:center;padding:14px">لا توجد تفاصيل</td></tr>';
+  const bottom = lines.length > 10 ? lines.slice(-5).reverse() : [];
+  document.getElementById('bottomLinesBody').innerHTML =
+    bottom.map(linesRow).join('') ||
+    '<tr><td colspan="4" class="muted" style="text-align:center;padding:14px">—</td></tr>';
 
-  const opsNote = report.notes.length ? report.notes[report.notes.length - 1] : null;
-  document.getElementById('noteBody').value = opsNote ? opsNote.body : '';
+  // الملاحظات المصنفة
+  const byCat = {};
+  (report.notes || []).forEach((n) => { byCat[n.category] = n.body; });
+  NOTE_CATS.forEach((c) => { document.getElementById(`note-${c}`).value = byCat[c] || ''; });
 
   document.getElementById('exportBtn').href = `/report/${report.report_date}/print`;
   setLocked(report.status === 'approved' || isAdminViewer);
+}
+
+function collectNotes() {
+  const notes = {};
+  NOTE_CATS.forEach((c) => { notes[c] = document.getElementById(`note-${c}`).value; });
+  return notes;
 }
 
 async function loadReviews() {
@@ -80,8 +150,8 @@ async function loadReviews() {
   const kpi = document.getElementById('kpiRating');
   const sub = document.getElementById('kpiRatingSub');
   if (stats.count > 0) {
-    kpi.innerHTML = `${nf.format(stats.avg_rating)} <small>من ٥ (${nf0.format(stats.count)} مراجعة)</small>`;
-    sub.innerHTML = `<span class="up">▲ ${nf0.format(stats.positive)} إيجابي</span> · <span class="down">▼ ${nf0.format(stats.negative)} سلبي</span>`;
+    kpi.innerHTML = `${nf.format(stats.avg_rating)} <small>من ٥ (${nf0.format(stats.count)})</small>`;
+    sub.innerHTML = `<span class="up">${nf0.format(stats.positive)} إيجابي</span> · <span class="down">${nf0.format(stats.negative)} سلبي</span>`;
   } else {
     kpi.innerHTML = '<small>لا توجد مراجعات بعد</small>';
   }
@@ -89,21 +159,21 @@ async function loadReviews() {
     ? (stats.last_sync_at ? `آخر مزامنة: ${stats.last_sync_at.slice(0, 16).replace('T', ' ')}` : 'لم تتم مزامنة بعد')
     : 'المزامنة غير مُفعّلة (أضف APIFY_TOKEN)';
   document.getElementById('reviewsStrip').innerHTML =
-    list.reviews.slice(0, 3).map(reviewCardHtml).join('') ||
+    list.reviews.slice(0, 4).map(reviewCardHtml).join('') ||
     '<p class="muted">لا توجد مراجعات محفوظة — جرّب المزامنة.</p>';
   return stats;
 }
 
-async function pollSync() {
+function pollSync() {
   const btn = document.getElementById('syncReviewsBtn');
   btn.disabled = true;
-  btn.textContent = '⏳ جارٍ المزامنة…';
+  btn.textContent = 'جارٍ المزامنة…';
   const timer = setInterval(async () => {
     const stats = await loadReviews();
     if (!stats.sync_running) {
       clearInterval(timer);
       btn.disabled = false;
-      btn.textContent = '↻ مزامنة الآن';
+      btn.textContent = 'مزامنة الآن';
       toast(stats.last_sync_status === 'ok' ? 'تمت مزامنة المراجعات بنجاح' : `المزامنة: ${stats.last_sync_status || 'انتهت'}`,
         stats.last_sync_status !== 'ok');
     }
@@ -114,29 +184,36 @@ document.addEventListener('DOMContentLoaded', async () => {
   const user = await initTopbar();
   isAdminViewer = user.role === 'admin';
 
+  await loadTables();
   const dates = await loadDates();
   await loadReport(dates.length ? null : undefined);
   loadReviews().catch(() => {});
 
   document.getElementById('dateSelect').addEventListener('change', (e) => loadReport(e.target.value));
 
-  document.getElementById('saveNoteBtn').addEventListener('click', async () => {
-    const body = document.getElementById('noteBody').value.trim();
-    if (!body) return toast('اكتب ملاحظة أولاً', true);
+  document.getElementById('saveTablesBtn').addEventListener('click', async () => {
+    const n = Number(document.getElementById('tablesCount').value);
+    if (!Number.isInteger(n) || n < 1) return toast('أدخل عدد طاولات صحيحاً', true);
     try {
-      await api(`/api/ops/report/${currentDate}/notes`, { method: 'PUT', body: { body } });
+      await api('/api/ops/settings', { method: 'PUT', body: { tables_count: n } });
+      tablesCount = n;
+      renderTableAvg();
+      toast('تم حفظ عدد الطاولات');
+    } catch (err) { toast(err.message, true); }
+  });
+
+  document.getElementById('saveNoteBtn').addEventListener('click', async () => {
+    try {
+      await api(`/api/ops/report/${currentDate}/notes`, { method: 'PUT', body: { notes: collectNotes() } });
       toast('تم حفظ الملاحظات');
     } catch (err) { toast(err.message, true); }
   });
 
   document.getElementById('approveBtn').addEventListener('click', async () => {
     if (currentStatus === 'approved') return;
-    const noteBody = document.getElementById('noteBody').value.trim();
     if (!confirm(`اعتماد تقرير يوم ${currentDate} ونشره للإدارة؟\nلا يمكن التعديل عليه بعد الاعتماد.`)) return;
     try {
-      if (noteBody) {
-        await api(`/api/ops/report/${currentDate}/notes`, { method: 'PUT', body: { body: noteBody } }).catch(() => {});
-      }
+      await api(`/api/ops/report/${currentDate}/notes`, { method: 'PUT', body: { notes: collectNotes() } }).catch(() => {});
       const res = await api(`/api/ops/report/${currentDate}/approve`, { method: 'POST' });
       toast(res.message || 'تم الاعتماد');
       await loadDates();

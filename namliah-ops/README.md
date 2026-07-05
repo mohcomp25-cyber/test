@@ -51,11 +51,16 @@ X-Webhook-Secret: <WEBHOOK_SECRET من ملف .env>
     "total_sales": 12450.75,
     "orders_count": 183,
     "avg_ticket": 68.04,
+    "deductions": { "coupons": 320.00, "discounts": 145.50, "cancellations": 89.00 },
     "payment_breakdown": { "cash": 2100.00, "card": 7350.75, "online": 3000.00 },
-    "channel_breakdown": {
-      "dine_in": 5200.00,
+    "hall_sales": [
+      { "waiter": "جورج", "total": 2100.00 },
+      { "waiter": "إيلي", "total": 1750.50 }
+    ],
+    "external_sales": {
       "takeaway": 2250.75,
-      "delivery_apps": { "hungerstation": 2400.00, "jahez": 1600.00 }
+      "hungerstation": 2400.00,
+      "jahez": 1600.00
     }
   },
   "lines": [
@@ -68,7 +73,10 @@ X-Webhook-Secret: <WEBHOOK_SECRET من ملف .env>
 
 - `date` بصيغة `YYYY-MM-DD` (يوم العمل بتوقيت الرياض) — **تقرير واحد لكل يوم**.
 - `avg_ticket` اختياري؛ يُحسب تلقائياً من `total_sales / orders_count` إن غاب.
-- `payment_breakdown` و `channel_breakdown` اختياريان ومفاتيحهما حرة (تظهر بأسماء عربية معروفة تلقائياً: cash، card، dine_in، hungerstation، jahez…).
+- `deductions` اختياري: الكوبونات المخصومة، الخصومات، والإلغاءات — تظهر تحت إجمالي المبيعات.
+- `hall_sales` اختياري: مبيعات الصالة موزعة على الويترز `[{waiter, total}]` — تظهر في قسم «توزيع المبيعات» ويُحسب منها متوسط مبيعات الطاولة (بقسمة إجمالي الصالة على عدد الطاولات الذي يضبطه مدير التشغيل من المنصة).
+- `external_sales` اختياري: الطلبات الخارجية (استلام + تطبيقات التوصيل)، مفاتيحه حرة وتظهر بأسماء عربية معروفة تلقائياً (takeaway، hungerstation، jahez…). الاسم القديم `channel_breakdown` ما زال مقبولاً.
+- `payment_breakdown` اختياري ومفاتيحه حرة (cash، card، online…).
 - **إعادة الإرسال لنفس اليوم**: إذا كان التقرير غير معتمد تُستبدل بياناته بالكامل (والملاحظات تبقى). إذا كان معتمداً يُرفض بـ `409` حفاظاً على التقرير المنشور — اعتبرها نجاحاً في منطق إعادة المحاولة.
 
 | الرد | المعنى |

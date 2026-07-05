@@ -47,23 +47,46 @@ function rand() {
 
 const insReport = db.prepare(`
   INSERT OR IGNORE INTO daily_reports
-    (report_date, status, total_sales, orders_count, avg_ticket, payment_breakdown, channel_breakdown, approved_at, approved_by, is_demo)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    (report_date, status, total_sales, orders_count, avg_ticket, payment_breakdown, channel_breakdown, deductions, hall_sales, approved_at, approved_by, is_demo)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
 `);
 const insLine = db.prepare(
   'INSERT INTO sales_lines (report_id, product_name, category, qty, unit_price, total) VALUES (?, ?, ?, ?, ?, ?)'
 );
-const insNote = db.prepare('INSERT INTO notes (report_id, author_id, body) VALUES (?, ?, ?)');
+const insNote = db.prepare('INSERT INTO notes (report_id, author_id, category, body) VALUES (?, ?, ?, ?)');
 
-const NOTES = [
-  'يوم هادئ نسبياً، تم تدريب موظف الاستقبال الجديد على نظام الطلبات.',
-  'ضغط عالٍ وقت العشاء — نحتاج كاشير إضافي نهاية الأسبوع.',
-  'تأخر مورد الخضار ساعتين، تمت معالجة النقص من المستودع.',
-  'شكوى عميل على مدة تجهيز المشاوي وقت الذروة، تم الاعتذار وتقديم حلى مجاني.',
-  'صيانة دورية للشواية الرئيسية بعد الإغلاق.',
-  'حملة تطبيقات التوصيل رفعت الطلبات بشكل ملحوظ اليوم.',
-  'انقطاع كهرباء قصير (١٠ دقائق) — المولد الاحتياطي عمل بشكل سليم.'
-];
+const WAITERS = ['جورج', 'إيلي', 'طوني', 'مروان', 'شربل'];
+
+const NOTES_BY_CATEGORY = {
+  customers: [
+    'شكوى عميل على مدة تجهيز المشاوي وقت الذروة — تم الاعتذار وتقديم حلى مجاني، والعميل غادر راضياً.',
+    'عميلة طلبت خيارات خالية من الغلوتين — تم توجيهها للأصناف المناسبة وأوصينا المطبخ بإضافة ملصق توضيحي.',
+    'طاولة عائلية أثنت على الخدمة وطلبت التواصل مع الإدارة للشكر.'
+  ],
+  operations: [
+    'ضغط عالٍ وقت العشاء — نحتاج كاشير إضافي نهاية الأسبوع.',
+    'تم تدريب موظف الاستقبال الجديد على نظام الطلبات.',
+    'حملة تطبيقات التوصيل رفعت الطلبات بشكل ملحوظ اليوم.'
+  ],
+  kitchen: [
+    'تأخر مورد الخضار ساعتين — تمت معالجة النقص من المستودع.',
+    'استهلاك زيت القلي أعلى من المعتاد، تمت جدولة مراجعة للمقادير.',
+    'تجهيز مسبق ناجح لكميات الحمص والمتبل قلل زمن الانتظار.'
+  ],
+  maintenance: [
+    'صيانة دورية للشواية الرئيسية بعد الإغلاق.',
+    'انقطاع كهرباء قصير (١٠ دقائق) — المولد الاحتياطي عمل بشكل سليم.',
+    'تم إصلاح تسريب بسيط في مغسلة المطبخ.'
+  ],
+  general: [
+    'يوم هادئ نسبياً بشكل عام.',
+    'زيارة تفتيشية من البلدية — لا ملاحظات.',
+    'اجتماع قصير مع الفريق قبل الوردية لمراجعة أهداف الأسبوع.'
+  ]
+};
+
+// عدد طاولات الصالة الافتراضي (يعدّله مدير التشغيل من المنصة)
+db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('tables_count', '14')").run();
 
 const today = new Date(Date.now() + 3 * 3600 * 1000); // Asia/Riyadh
 let created = 0;
@@ -92,11 +115,29 @@ const seedTx = db.transaction(() => {
     const online = +(total * (0.2 + rand() * 0.1)).toFixed(2);
     const card = +(total - cash - online).toFixed(2);
 
+    // الطلبات الخارجية (تطبيقات + استلام) ومبيعات الصالة موزعة على الويترز
     const hunger = +(total * (0.1 + rand() * 0.08)).toFixed(2);
     const jahez = +(total * (0.07 + rand() * 0.06)).toFixed(2);
     const keeta = +(total * (0.03 + rand() * 0.04)).toFixed(2);
     const takeaway = +(total * (0.14 + rand() * 0.06)).toFixed(2);
-    const dineIn = +(total - hunger - jahez - keeta - takeaway).toFixed(2);
+    const hallTotal = +(total - hunger - jahez - keeta - takeaway).toFixed(2);
+
+    const weights = WAITERS.map(() => 0.6 + rand());
+    const wSum = weights.reduce((a, b) => a + b, 0);
+    let allocated = 0;
+    const hallSales = WAITERS.map((w, wi) => {
+      const share = wi === WAITERS.length - 1
+        ? +(hallTotal - allocated).toFixed(2)
+        : +((hallTotal * weights[wi]) / wSum).toFixed(2);
+      allocated = +(allocated + share).toFixed(2);
+      return { waiter: w, total: share };
+    });
+
+    const deductions = {
+      coupons: +(total * (0.01 + rand() * 0.02)).toFixed(2),
+      discounts: +(total * (0.005 + rand() * 0.015)).toFixed(2),
+      cancellations: +(total * (rand() * 0.01)).toFixed(2)
+    };
 
     const approved = i >= 2; // آخر يومين pending لتجربة الاعتماد
     const info = insReport.run(
@@ -104,7 +145,9 @@ const seedTx = db.transaction(() => {
       approved ? 'approved' : 'pending',
       total, orders, avg,
       JSON.stringify({ cash, card, online }),
-      JSON.stringify({ dine_in: dineIn, takeaway, delivery_apps: { hungerstation: hunger, jahez, keeta } }),
+      JSON.stringify({ takeaway, hungerstation: hunger, jahez, keeta }),
+      JSON.stringify(deductions),
+      JSON.stringify(hallSales),
       approved ? `${date} 23:45:00` : null,
       approved ? opsUser.id : null
     );
@@ -112,7 +155,9 @@ const seedTx = db.transaction(() => {
     created++;
     const reportId = info.lastInsertRowid;
     for (const l of lines) insLine.run(reportId, l.name, l.cat, l.qty, l.price, l.total);
-    if (rand() < 0.75) insNote.run(reportId, opsUser.id, NOTES[Math.floor(rand() * NOTES.length)]);
+    for (const [cat, pool] of Object.entries(NOTES_BY_CATEGORY)) {
+      if (rand() < 0.45) insNote.run(reportId, opsUser.id, cat, pool[Math.floor(rand() * pool.length)]);
+    }
   }
 });
 seedTx();

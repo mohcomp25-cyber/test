@@ -5,14 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>لوحة الإدارة — منصة عمليات نملية</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Amiri:wght@700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/brand.css">
-<link rel="icon" href="/img/logo.svg">
+<link rel="icon" href="/img/logo-black.png">
 </head>
 <body>
 <header class="topbar">
-  <div class="brand">نملية</div>
-  <div class="page-title">لوحة الإدارة — تحليل الأداء اليومي</div>
+  <img class="brand-logo" src="/img/logo-cream.png" alt="نملية — مطعم من الريف اللبناني">
+  <div class="page-title">لوحة الإدارة · تحليل الأداء اليومي</div>
   <div class="spacer"></div>
   <span class="user" id="userName"></span>
   <button class="btn-logout" id="logoutBtn">تسجيل الخروج</button>
@@ -35,7 +35,7 @@
 
   <!-- KPIs -->
   <section class="kpi-grid">
-    <div class="kpi-card"><div class="kpi-label">إجمالي المبيعات</div><div class="kpi-value" id="kpiSales">—</div><div class="kpi-sub" id="kpiDays"></div></div>
+    <div class="kpi-card"><div class="kpi-label">إجمالي المبيعات</div><div class="kpi-value" id="kpiSales">—</div><div class="kpi-sub" id="kpiDays"></div><div class="kpi-breakdown" id="kpiDeductions"></div></div>
     <div class="kpi-card"><div class="kpi-label">عدد الطلبات</div><div class="kpi-value" id="kpiOrders">—</div></div>
     <div class="kpi-card"><div class="kpi-label">متوسط الفاتورة</div><div class="kpi-value" id="kpiAvg">—</div></div>
     <div class="kpi-card"><div class="kpi-label">متوسط المبيعات اليومية</div><div class="kpi-value" id="kpiDaily">—</div></div>
@@ -59,11 +59,15 @@
       <div class="chart-box chart-box--tall"><canvas id="categoryChart"></canvas></div>
     </div>
     <div class="card chart-card">
+      <h3>مبيعات الصالة حسب الويتر</h3>
+      <div class="chart-box"><canvas id="waitersChart"></canvas></div>
+    </div>
+    <div class="card chart-card">
       <h3>طرق الدفع</h3>
       <div class="chart-box"><canvas id="paymentChart"></canvas></div>
     </div>
     <div class="card chart-card">
-      <h3>قنوات البيع</h3>
+      <h3>الطلبات الخارجية</h3>
       <div class="chart-box"><canvas id="channelChart"></canvas></div>
     </div>
   </section>

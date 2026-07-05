@@ -23,6 +23,16 @@ function validatePayload(body) {
     if (s.avg_ticket != null && typeof s.avg_ticket !== 'number') errors.push('summary.avg_ticket');
     if (s.payment_breakdown != null && typeof s.payment_breakdown !== 'object') errors.push('summary.payment_breakdown');
     if (s.channel_breakdown != null && typeof s.channel_breakdown !== 'object') errors.push('summary.channel_breakdown');
+    if (s.external_sales != null && typeof s.external_sales !== 'object') errors.push('summary.external_sales');
+    if (s.deductions != null && typeof s.deductions !== 'object') errors.push('summary.deductions');
+    if (s.hall_sales != null) {
+      if (!Array.isArray(s.hall_sales)) errors.push('summary.hall_sales');
+      else s.hall_sales.forEach((w, i) => {
+        if (!w || typeof w !== 'object' || !w.waiter || typeof w.total !== 'number') {
+          errors.push(`summary.hall_sales[${i}]`);
+        }
+      });
+    }
   }
   if (!Array.isArray(body.lines)) {
     errors.push('lines');
@@ -42,6 +52,10 @@ const ingestTx = db.transaction((body) => {
   const avgTicket = s.avg_ticket != null
     ? s.avg_ticket
     : (s.orders_count > 0 ? s.total_sales / s.orders_count : 0);
+  // external_sales هو الاسم الجديد للطلبات الخارجية؛ channel_breakdown مقبول للتوافق
+  const externalSales = s.external_sales || s.channel_breakdown || {};
+  const deductions = s.deductions || {};
+  const hallSales = Array.isArray(s.hall_sales) ? s.hall_sales : [];
 
   const existing = db.prepare('SELECT id, status FROM daily_reports WHERE report_date = ?').get(body.date);
   if (existing && existing.status === 'approved') {
@@ -54,12 +68,13 @@ const ingestTx = db.transaction((body) => {
     db.prepare(`
       UPDATE daily_reports SET
         total_sales = ?, orders_count = ?, avg_ticket = ?,
-        payment_breakdown = ?, channel_breakdown = ?,
+        payment_breakdown = ?, channel_breakdown = ?, deductions = ?, hall_sales = ?,
         raw_payload = ?, received_at = datetime('now'), is_demo = 0
       WHERE id = ?
     `).run(
       s.total_sales, s.orders_count, avgTicket,
-      JSON.stringify(s.payment_breakdown || {}), JSON.stringify(s.channel_breakdown || {}),
+      JSON.stringify(s.payment_breakdown || {}), JSON.stringify(externalSales),
+      JSON.stringify(deductions), JSON.stringify(hallSales),
       JSON.stringify(body), existing.id
     );
     db.prepare('DELETE FROM sales_lines WHERE report_id = ?').run(existing.id);
@@ -68,11 +83,12 @@ const ingestTx = db.transaction((body) => {
   } else {
     const info = db.prepare(`
       INSERT INTO daily_reports
-        (report_date, total_sales, orders_count, avg_ticket, payment_breakdown, channel_breakdown, raw_payload)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+        (report_date, total_sales, orders_count, avg_ticket, payment_breakdown, channel_breakdown, deductions, hall_sales, raw_payload)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       body.date, s.total_sales, s.orders_count, avgTicket,
-      JSON.stringify(s.payment_breakdown || {}), JSON.stringify(s.channel_breakdown || {}),
+      JSON.stringify(s.payment_breakdown || {}), JSON.stringify(externalSales),
+      JSON.stringify(deductions), JSON.stringify(hallSales),
       JSON.stringify(body)
     );
     reportId = info.lastInsertRowid;
@@ -108,7 +124,9 @@ function reportRowToJson(row) {
     orders_count: row.orders_count,
     avg_ticket: row.avg_ticket,
     payment_breakdown: JSON.parse(row.payment_breakdown || '{}'),
-    channel_breakdown: JSON.parse(row.channel_breakdown || '{}'),
+    external_sales: JSON.parse(row.channel_breakdown || '{}'),
+    deductions: JSON.parse(row.deductions || '{}'),
+    hall_sales: JSON.parse(row.hall_sales || '[]'),
     received_at: row.received_at,
     approved_at: row.approved_at,
     approved_by_name: row.approved_by_name || null,
@@ -128,7 +146,7 @@ function getReportByDate(date, { approvedOnly = false } = {}) {
     'SELECT product_name, category, qty, unit_price, total FROM sales_lines WHERE report_id = ? ORDER BY total DESC'
   ).all(row.id);
   report.notes = db.prepare(`
-    SELECT n.id, n.body, n.created_at, n.updated_at, u.display_name AS author
+    SELECT n.id, n.category, n.body, n.created_at, n.updated_at, u.display_name AS author
     FROM notes n JOIN users u ON u.id = n.author_id
     WHERE n.report_id = ? ORDER BY n.created_at
   `).all(row.id);
@@ -150,17 +168,37 @@ function listDates() {
 
 // ---- notes ----
 
-function upsertOpsNote(date, userId, body) {
+const NOTE_CATEGORIES = ['customers', 'operations', 'kitchen', 'maintenance', 'general'];
+
+// ملاحظة واحدة لكل تصنيف لكل تقرير — تُحدَّث في مكانها، وحذفها إن أُفرغ النص
+const upsertNotesTx = db.transaction((reportId, userId, notesByCategory) => {
+  for (const [category, rawBody] of Object.entries(notesByCategory)) {
+    const body = String(rawBody || '').trim();
+    const existing = db.prepare(
+      'SELECT id FROM notes WHERE report_id = ? AND category = ?'
+    ).get(reportId, category);
+    if (!body) {
+      if (existing) db.prepare('DELETE FROM notes WHERE id = ?').run(existing.id);
+    } else if (existing) {
+      db.prepare("UPDATE notes SET body = ?, author_id = ?, updated_at = datetime('now') WHERE id = ?")
+        .run(body, userId, existing.id);
+    } else {
+      db.prepare('INSERT INTO notes (report_id, author_id, category, body) VALUES (?, ?, ?, ?)')
+        .run(reportId, userId, category, body);
+    }
+  }
+});
+
+function upsertOpsNotes(date, userId, notesByCategory) {
   const report = db.prepare('SELECT id, status FROM daily_reports WHERE report_date = ?').get(date);
   if (!report) return { error: 'no_report' };
   if (report.status === 'approved') return { error: 'report_already_approved' };
-  const existing = db.prepare('SELECT id FROM notes WHERE report_id = ? AND author_id = ?').get(report.id, userId);
-  if (existing) {
-    db.prepare("UPDATE notes SET body = ?, updated_at = datetime('now') WHERE id = ?").run(body, existing.id);
-  } else {
-    db.prepare('INSERT INTO notes (report_id, author_id, body) VALUES (?, ?, ?)').run(report.id, userId, body);
+  const filtered = {};
+  for (const cat of NOTE_CATEGORIES) {
+    if (cat in notesByCategory) filtered[cat] = notesByCategory[cat];
   }
-  audit('notes_saved', userId, { date });
+  upsertNotesTx(report.id, userId, filtered);
+  audit('notes_saved', userId, { date, categories: Object.keys(filtered) });
   return { ok: true };
 }
 
@@ -214,7 +252,9 @@ function dashboardData(from, to) {
 
   // Merge JSON breakdowns in JS (tiny row counts; simpler than SQLite JSON1)
   const paymentMix = {};
-  const channelMix = {};
+  const externalMix = {};
+  const deductionsMix = {};
+  const waiterTotals = {};
   const addFlat = (target, obj, prefix) => {
     for (const [k, v] of Object.entries(obj || {})) {
       if (v && typeof v === 'object') addFlat(target, v, k);
@@ -226,8 +266,17 @@ function dashboardData(from, to) {
   };
   for (const r of reports) {
     addFlat(paymentMix, JSON.parse(r.payment_breakdown || '{}'), '');
-    addFlat(channelMix, JSON.parse(r.channel_breakdown || '{}'), '');
+    addFlat(externalMix, JSON.parse(r.channel_breakdown || '{}'), '');
+    addFlat(deductionsMix, JSON.parse(r.deductions || '{}'), '');
+    for (const w of JSON.parse(r.hall_sales || '[]')) {
+      if (w && w.waiter && typeof w.total === 'number') {
+        waiterTotals[w.waiter] = (waiterTotals[w.waiter] || 0) + w.total;
+      }
+    }
   }
+  const waiters = Object.entries(waiterTotals)
+    .map(([waiter, total]) => ({ waiter, total }))
+    .sort((a, b) => b.total - a.total);
 
   const ids = reports.map((r) => r.id);
   let topProducts = [];
@@ -246,27 +295,28 @@ function dashboardData(from, to) {
       GROUP BY category ORDER BY total DESC
     `).all(...ids);
     notesFeed = db.prepare(`
-      SELECT r.report_date, n.body, u.display_name AS author, n.updated_at
+      SELECT r.report_date, n.category, n.body, u.display_name AS author, n.updated_at
       FROM notes n
       JOIN daily_reports r ON r.id = n.report_id
       JOIN users u ON u.id = n.author_id
       WHERE n.report_id IN (${ph})
-      ORDER BY r.report_date DESC LIMIT 30
+      ORDER BY r.report_date DESC LIMIT 40
     `).all(...ids);
   }
 
-  return { totals, trend, paymentMix, channelMix, topProducts, categoryMix, notesFeed };
+  return { totals, trend, paymentMix, externalMix, deductionsMix, waiters, topProducts, categoryMix, notesFeed };
 }
 
 module.exports = {
   DATE_RE,
+  NOTE_CATEGORIES,
   riyadhToday,
   validatePayload,
   ingestWebhook,
   getReportByDate,
   latestReportDate,
   listDates,
-  upsertOpsNote,
+  upsertOpsNotes,
   approveReport,
   listApproved,
   dashboardData

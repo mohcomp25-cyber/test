@@ -28,7 +28,8 @@ const money = (n) => `${nf.format(n || 0)} ر.س`;
 const MIX_LABELS = {
   cash: 'نقدي', card: 'شبكة/بطاقة', online: 'دفع إلكتروني', other: 'أخرى',
   dine_in: 'صالة', takeaway: 'استلام', delivery: 'توصيل', delivery_apps: 'تطبيقات التوصيل',
-  hungerstation: 'هنقرستيشن', jahez: 'جاهز', toyou: 'تويو', mrsool: 'مرسول', keeta: 'كيتا'
+  hungerstation: 'هنقرستيشن', jahez: 'جاهز', toyou: 'تويو', mrsool: 'مرسول', keeta: 'كيتا',
+  coupons: 'كوبونات', discounts: 'خصومات', cancellations: 'إلغاءات'
 };
 const mixLabel = (k) => MIX_LABELS[String(k).split(':').pop()] || String(k).split(':').pop();
 
@@ -41,7 +42,8 @@ function flattenMix(obj, prefix = '') {
   return out;
 }
 
-const CHART_COLORS = ['#5A7A34', '#A87E24', '#058E7E', '#B4552D', '#4A5FA5', '#9C4270'];
+// لوحة مُتحقق منها (CVD + تباين) على أسطح هوية نملية
+const CHART_COLORS = ['#5F7A26', '#A24C5E', '#96690F', '#058E7E', '#B5612C'];
 
 function esc(s) {
   return String(s == null ? '' : s)
@@ -83,6 +85,23 @@ function renderMixList(container, mix) {
       <span class="mix-val">${money(v)}</span>
       <span class="mix-pct">${nf.format((v / sum) * 100)}٪</span>
     </div>`).join('');
+}
+
+// شرائح مضغوطة (لبطاقة طرق الدفع المصغّرة)
+function renderChips(container, mix) {
+  const flat = Object.entries(flattenMix(mix)).sort((a, b) => b[1] - a[1]);
+  if (!flat.length) {
+    container.innerHTML = '<span class="muted">لا توجد بيانات</span>';
+    return;
+  }
+  const sum = flat.reduce((a, [, v]) => a + v, 0) || 1;
+  container.innerHTML = flat.map(([k, v], i) => `
+    <span class="chip">
+      <span class="dot" style="background:${CHART_COLORS[i % CHART_COLORS.length]}"></span>
+      ${esc(mixLabel(k))}
+      <b>${money(v)}</b>
+      <span class="pct">${nf.format((v / sum) * 100)}٪</span>
+    </span>`).join('');
 }
 
 function reviewCardHtml(r) {

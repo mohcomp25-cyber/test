@@ -33,6 +33,10 @@ async function loadDashboard(from, to) {
   document.getElementById('kpiAvg').textContent = money(data.totals.avg_ticket);
   document.getElementById('kpiDaily').textContent = money(data.totals.avg_daily_sales);
   document.getElementById('kpiDays').textContent = `${nf0.format(data.totals.days)} يوم معتمد في المدى المحدد`;
+  const ded = data.deductionsMix || {};
+  document.getElementById('kpiDeductions').innerHTML = [
+    ['كوبونات', ded.coupons], ['خصومات', ded.discounts], ['إلغاءات', ded.cancellations]
+  ].map(([label, v]) => `<span>${label}: <b>${money(v || 0)}</b></span>`).join('');
   if (data.reviews.count > 0) {
     document.getElementById('kpiRating').innerHTML =
       `${nf.format(data.reviews.avg_rating)} <small>من ٥</small>`;
@@ -154,7 +158,34 @@ async function loadDashboard(from, to) {
     });
   };
   doughnut('paymentChart', data.paymentMix);
-  doughnut('channelChart', data.channelMix);
+  doughnut('channelChart', data.externalMix);
+
+  // مبيعات الصالة حسب الويتر — سلسلة اسمية واحدة: لون واحد
+  const waiters = data.waiters || [];
+  makeChart('waitersChart', {
+    type: 'bar',
+    data: {
+      labels: waiters.map((w) => w.waiter),
+      datasets: [{
+        label: 'المبيعات',
+        data: waiters.map((w) => w.total),
+        backgroundColor: CHART_COLORS[3],
+        maxBarThickness: 22
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (c) => ` ${money(c.parsed.x)}` } }
+      },
+      scales: {
+        x: { beginAtZero: true, ticks: { callback: moneyTick }, position: 'top' },
+        y: { grid: { display: false } }
+      }
+    }
+  });
 
   // جدول التقارير المعتمدة
   const reportsList = await api(`/api/admin/reports?from=${from}&to=${to}`);
@@ -168,10 +199,14 @@ async function loadDashboard(from, to) {
       <td><a class="btn btn--outline btn--sm" href="/report/${r.report_date}/print" target="_blank">عرض / طباعة</a></td>
     </tr>`).join('') || '<tr><td colspan="6" class="muted" style="text-align:center;padding:30px">لا توجد تقارير معتمدة في هذا المدى</td></tr>';
 
-  // تغذية الملاحظات
+  // تغذية الملاحظات المصنفة
+  const CAT_LABELS = {
+    customers: 'زبائن', operations: 'تشغيل', kitchen: 'مطبخ',
+    maintenance: 'صيانة', general: 'عام'
+  };
   document.getElementById('notesFeed').innerHTML = data.notesFeed.map((n) => `
     <div class="note-item">
-      <div class="note-date">${n.report_date} — ${esc(n.author)}</div>
+      <div class="note-date">${n.report_date} — ${esc(n.author)}<span class="note-cat">${CAT_LABELS[n.category] || esc(n.category)}</span></div>
       <div>${esc(n.body)}</div>
     </div>`).join('') || '<p class="muted">لا توجد ملاحظات في هذا المدى</p>';
 }

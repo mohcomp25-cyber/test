@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS daily_reports (
   avg_ticket REAL NOT NULL DEFAULT 0,
   payment_breakdown TEXT NOT NULL DEFAULT '{}',
   channel_breakdown TEXT NOT NULL DEFAULT '{}',
+  deductions TEXT NOT NULL DEFAULT '{}',
+  hall_sales TEXT NOT NULL DEFAULT '[]',
   raw_payload TEXT,
   received_at TEXT NOT NULL DEFAULT (datetime('now')),
   approved_at TEXT,
@@ -51,6 +53,8 @@ CREATE TABLE IF NOT EXISTS notes (
   id INTEGER PRIMARY KEY,
   report_id INTEGER NOT NULL REFERENCES daily_reports(id) ON DELETE CASCADE,
   author_id INTEGER NOT NULL REFERENCES users(id),
+  category TEXT NOT NULL DEFAULT 'general'
+    CHECK (category IN ('customers','operations','kitchen','maintenance','general')),
   body TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -93,6 +97,15 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `);
+
+// ترقية قواعد بيانات موجودة قبل إضافة الأعمدة الجديدة (idempotent)
+function addColumnIfMissing(table, column, ddl) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+  if (!cols.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+}
+addColumnIfMissing('daily_reports', 'deductions', "deductions TEXT NOT NULL DEFAULT '{}'");
+addColumnIfMissing('daily_reports', 'hall_sales', "hall_sales TEXT NOT NULL DEFAULT '[]'");
+addColumnIfMissing('notes', 'category', "category TEXT NOT NULL DEFAULT 'general'");
 
 function getSetting(key) {
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
