@@ -43,19 +43,27 @@ async function apifyFetch(pathname, options) {
   return res.json();
 }
 
-async function startRun(branch) {
-  // توفير التوكن: نسحب مراجعات يوم العمل فقط (من أمس بتوقيت الرياض)
-  // — التكرار بين الليالي يُرشَّح تلقائياً بالـ upsert على external_id
+async function startRun(branch, { full = false } = {}) {
+  // المزامنة الليلية (full=false): مراجعات يوم العمل فقط (من أمس) توفيراً للتوكن.
+  // المزامنة اليدوية الكاملة (full=true): تسحب التاريخ الأوسع — مناسبة لأول تشغيل
+  // وعند الضغط على «مزامنة الآن». التكرار يُرشَّح تلقائياً بالـ upsert على external_id.
   const yesterdayRiyadh = new Date(Date.now() + 3 * 3600 * 1000 - 86400000)
     .toISOString().slice(0, 10);
   const input = {
     startUrls: [{ url: mapsUrlFor(branch) }],
-    maxReviews: Number(process.env.APIFY_MAX_REVIEWS || 50),
-    reviewsStartDate: process.env.APIFY_REVIEWS_START_DATE || yesterdayRiyadh,
+    maxReviews: full
+      ? Number(process.env.APIFY_MAX_REVIEWS_FULL || 300)
+      : Number(process.env.APIFY_MAX_REVIEWS || 50),
     reviewsSort: 'newest',
     language: 'ar',
     personalData: true
   };
+  // في الوضع الكامل لا نقيّد بتاريخ (نسحب التاريخ حتى الحد الأقصى)
+  if (!full) {
+    input.reviewsStartDate = process.env.APIFY_REVIEWS_START_DATE || yesterdayRiyadh;
+  } else if (process.env.APIFY_REVIEWS_START_DATE) {
+    input.reviewsStartDate = process.env.APIFY_REVIEWS_START_DATE;
+  }
   const data = await apifyFetch(`/acts/${actorId()}/runs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -125,7 +133,7 @@ const saveAllTx = db.transaction((rows) => {
   return saved;
 });
 
-async function syncReviews(branch, triggeredBy) {
+async function syncReviews(branch, triggeredBy, opts = {}) {
   if (!isConfigured(branch)) {
     setSetting(`last_reviews_sync_status:${branch}`, 'not_configured');
     return { status: 'not_configured', branch };
@@ -135,7 +143,7 @@ async function syncReviews(branch, triggeredBy) {
   }
   setSetting(`reviews_sync_running:${branch}`, '1');
   try {
-    const run = await startRun(branch);
+    const run = await startRun(branch, { full: !!opts.full });
     const finished = await waitForRun(run.id);
     const items = await fetchDataset(finished.defaultDatasetId);
     const rows = (Array.isArray(items) ? items : []).map((it) => mapItem(branch, it)).filter(Boolean);

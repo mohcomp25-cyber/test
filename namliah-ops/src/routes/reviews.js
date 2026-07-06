@@ -80,8 +80,10 @@ router.post('/sync', (req, res) => {
   if (getSetting(`reviews_sync_running:${branch}`) === '1') {
     return res.status(409).json({ error: 'sync_running', message: 'هناك مزامنة قيد التنفيذ حالياً' });
   }
+  // المزامنة اليدوية تسحب التاريخ الكامل (أول تشغيل وعند الطلب)؛ الليلية أمس فقط
   // fire-and-forget; the frontend polls /stats for completion
-  apify.syncReviews(branch, req.session.userId).catch((err) => console.error('reviews sync error:', err));
+  apify.syncReviews(branch, req.session.userId, { full: true })
+    .catch((err) => console.error('reviews sync error:', err));
   res.status(202).json({ status: 'started', branch, message: 'بدأت المزامنة — قد تستغرق دقيقة إلى دقيقتين' });
 });
 
