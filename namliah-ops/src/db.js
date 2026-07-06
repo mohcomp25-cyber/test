@@ -164,6 +164,24 @@ if (oldCols.includes('branch') === false || !hasBranchUnique) {
   db.pragma('foreign_keys = ON');
 }
 
+// تنظيف نهائي: الطلبات الخارجية = استلام فقط — أي مفاتيح تطبيقات قديمة
+// مخزنة في قواعد بيانات سابقة تُعاد كتابتها إلى {takeaway} عند كل إقلاع (idempotent)
+(() => {
+  const rows = db.prepare('SELECT id, channel_breakdown FROM daily_reports').all();
+  const upd = db.prepare('UPDATE daily_reports SET channel_breakdown = ? WHERE id = ?');
+  const cleanTx = db.transaction(() => {
+    for (const row of rows) {
+      let mix;
+      try { mix = JSON.parse(row.channel_breakdown || '{}'); } catch { mix = {}; }
+      const keys = Object.keys(mix || {});
+      if (keys.length === 1 && keys[0] === 'takeaway' && typeof mix.takeaway === 'number') continue;
+      const takeaway = (mix && typeof mix.takeaway === 'number' && isFinite(mix.takeaway)) ? mix.takeaway : 0;
+      upd.run(JSON.stringify({ takeaway }), row.id);
+    }
+  });
+  cleanTx();
+})();
+
 function getSetting(key) {
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
   return row ? row.value : null;

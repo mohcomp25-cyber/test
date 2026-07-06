@@ -67,17 +67,12 @@ function renderWaiters(hallSales) {
   foot.innerHTML = `<tr><td>إجمالي الصالة</td><td class="num">${money(total)}</td><td class="num">100%</td></tr>`;
 }
 
-// بطاقة الاستلام المصغّرة: رقم الاستلام كبير + أي مفاتيح أخرى (إن وردت) كصفوف صغيرة
+// بطاقة الاستلام: الطلبات الخارجية = استلام حصراً (لا بيع عبر تطبيقات التوصيل)
 function renderExternal(mix, reportTotal) {
-  const flat = flattenMix(mix);
-  const pickup = flat.takeaway || 0;
-  const total = Object.values(flat).reduce((a, v) => a + v, 0);
+  const pickup = (mix && typeof mix.takeaway === 'number') ? mix.takeaway : 0;
   document.getElementById('pickupTotal').textContent = money(pickup);
-  document.getElementById('pickupShare').textContent = reportTotal
-    ? `${nf.format((total / reportTotal) * 100)}٪ من إجمالي المبيعات` : '';
-  const extra = Object.entries(flat).filter(([k]) => k !== 'takeaway').sort((a, b) => b[1] - a[1]);
-  document.getElementById('externalExtra').innerHTML = extra.map(([k, v]) => `
-    <div class="mix-row"><span class="mix-name">${esc(mixLabel(k))}</span><span class="mix-val">${money(v)}</span></div>`).join('');
+  document.getElementById('pickupShare').textContent = reportTotal && pickup
+    ? `${nf.format((pickup / reportTotal) * 100)}٪ من إجمالي المبيعات` : '';
 }
 
 // المبيعات بالساعة: بطاقات الذروة/أول/آخر طلب + رسم أعمدة

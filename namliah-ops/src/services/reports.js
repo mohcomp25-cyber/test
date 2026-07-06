@@ -59,13 +59,21 @@ function validatePayload(body) {
   return errors;
 }
 
+// استخراج قيمة الاستلام فقط من أي شكل قديم/جديد (بما فيها delivery_apps المتداخلة تُهمل)
+function extractTakeaway(obj) {
+  if (!obj || typeof obj !== 'object') return 0;
+  const v = obj.takeaway;
+  return typeof v === 'number' && isFinite(v) ? v : 0;
+}
+
 const ingestTx = db.transaction((branch, body) => {
   const s = body.summary;
   const avgTicket = s.avg_ticket != null
     ? s.avg_ticket
     : (s.orders_count > 0 ? s.total_sales / s.orders_count : 0);
-  // external_sales هو الاسم الجديد للطلبات الخارجية؛ channel_breakdown مقبول للتوافق
-  const externalSales = s.external_sales || s.channel_breakdown || {};
+  // الطلبات الخارجية = استلام حصراً — لا بيع عبر تطبيقات التوصيل.
+  // أي مفاتيح أخرى يرسلها الوورك فلو تُهمل ولا تدخل قاعدة البيانات.
+  const externalSales = { takeaway: extractTakeaway(s.external_sales || s.channel_breakdown) };
   const deductions = s.deductions || {};
   const hallSales = Array.isArray(s.hall_sales) ? s.hall_sales : [];
   const hourly = Array.isArray(s.hourly_sales)

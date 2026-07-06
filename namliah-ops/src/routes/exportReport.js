@@ -255,7 +255,7 @@ router.get('/:date/print', requireAuth, (req, res) => {
       </div>
       <div>
         <h3 class="muted" style="margin-bottom:4px">الطلبات الخارجية</h3>
-        ${mixRows(report.external_sales, { withTotal: true, totalLabel: 'إجمالي الخارجي' })}
+        <div class="mix-row"><span>استلام</span><b>${money((report.external_sales || {}).takeaway || 0)}</b><span class="pct"></span></div>
         <h3 class="muted" style="margin:12px 0 4px">طرق الدفع</h3>
         ${mixRows(report.payment_breakdown)}
       </div>
