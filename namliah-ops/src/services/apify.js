@@ -103,22 +103,43 @@ const upsertReview = db.prepare(`
     fetched_at = excluded.fetched_at
 `);
 
+// يوم العمل من طابع المراجعة: المراجعات قبل ٦ صباحاً بتوقيت الرياض تُنسب لليوم السابق
+// (مطابق لمنطق مبيعات ما بعد منتصف الليل). المدخل UTC ISO من Apify.
+function businessDate(published) {
+  if (!published) return null;
+  const s = String(published);
+  if (!s.includes('T')) return s.slice(0, 10); // تاريخ فقط بدون وقت
+  const ms = Date.parse(s);
+  if (!isFinite(ms)) return s.slice(0, 10);
+  // Riyadh = UTC+3، وحد يوم العمل ٦ صباحاً ⇒ الإزاحة الصافية = -3 ساعات من UTC
+  return new Date(ms - 3 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+// التقاط صور المراجعة من أي شكل قد يعيده الـ actor
+function extractPhotos(item) {
+  for (const key of ['reviewImageUrls', 'images', 'reviewImages', 'photoUrls', 'reviewPhotos', 'photos']) {
+    const v = item[key];
+    if (Array.isArray(v) && v.length) {
+      return v.map((p) => (typeof p === 'string' ? p : (p && (p.url || p.src || p.imageUrl)))).filter(Boolean);
+    }
+  }
+  return [];
+}
+
 function mapItem(branch, item) {
   const rating = Math.max(1, Math.min(5, Math.round(Number(item.stars ?? item.rating ?? 0)) || 0));
   if (!rating) return null;
   const externalId = item.reviewId || item.id;
   if (!externalId) return null;
-  const photos = Array.isArray(item.reviewImageUrls) ? item.reviewImageUrls
-    : Array.isArray(item.images) ? item.images : [];
   return {
     external_id: String(externalId),
     branch,
-    author_name: item.name || item.reviewerName || null,
+    author_name: item.name || item.reviewerName || item.reviewerTitle || null,
     author_photo_url: item.reviewerPhotoUrl || item.userPhotoUrl || null,
     rating,
     text: item.text || item.textTranslated || null,
-    review_date: item.publishedAtDate ? String(item.publishedAtDate).slice(0, 10) : null,
-    photos: JSON.stringify(photos),
+    review_date: businessDate(item.publishedAtDate || item.publishAtDate || item.date),
+    photos: JSON.stringify(extractPhotos(item)),
     owner_reply: item.responseFromOwnerText || null,
     sentiment: sentimentFor(rating)
   };
@@ -146,6 +167,12 @@ async function syncReviews(branch, triggeredBy, opts = {}) {
     const run = await startRun(branch, { full: !!opts.full });
     const finished = await waitForRun(run.id);
     const items = await fetchDataset(finished.defaultDatasetId);
+    // تشخيص: أول عنصر — حقوله وعينة صور — لتأكيد التقاط الصور من الـ actor
+    if (Array.isArray(items) && items[0]) {
+      const sample = items[0];
+      console.log(`[apify:${branch}] fetched ${items.length} · sample keys:`, Object.keys(sample).join(','));
+      console.log(`[apify:${branch}] sample photos:`, JSON.stringify(extractPhotos(sample)).slice(0, 200));
+    }
     const rows = (Array.isArray(items) ? items : []).map((it) => mapItem(branch, it)).filter(Boolean);
     const saved = saveAllTx(rows);
     setSetting(`last_reviews_sync_at:${branch}`, new Date().toISOString());

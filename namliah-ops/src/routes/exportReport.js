@@ -83,10 +83,11 @@ router.get('/:date/print', requireAuth, (req, res) => {
   const report = reports.getReportByDate(branch, date, { approvedOnly });
   if (!report) return res.status(404).send('لا يوجد تقرير لهذا اليوم');
 
+  // مراجعات يوم العمل نفسه (تاريخ التقرير)
   const latestReviews = db.prepare(`
-    SELECT author_name, rating, text, review_date, sentiment FROM reviews
-    WHERE branch = ? ORDER BY review_date DESC LIMIT 4
-  `).all(branch);
+    SELECT author_name, rating, text, review_date, sentiment, photos FROM reviews
+    WHERE branch = ? AND review_date = ? ORDER BY id DESC
+  `).all(branch, date);
   const reviewStats = db.prepare('SELECT COUNT(*) AS count, AVG(rating) AS avg FROM reviews WHERE branch = ?').get(branch);
 
   // مبيعات الصالة حسب الويتر
@@ -155,12 +156,18 @@ router.get('/:date/print', requireAuth, (req, res) => {
       </div>`).join('') || '<p class="muted">لا توجد ملاحظات لهذا اليوم</p>';
 
   const reviewsHtml = latestReviews.length
-    ? latestReviews.map((r) => `
+    ? latestReviews.map((r) => {
+        const photos = (() => { try { return JSON.parse(r.photos || '[]'); } catch { return []; } })();
+        const imgs = photos.slice(0, 4).map((p) =>
+          `<img src="${esc(p)}" style="width:64px;height:48px;object-fit:cover;border-radius:6px;border:1px solid var(--line-soft)">`).join('');
+        return `
         <div class="review">
           <div class="note-head"><b>${esc(r.author_name || 'زائر')}</b>${stars(r.rating)}<span class="muted">${esc(r.review_date || '')}</span></div>
           ${r.text ? `<p>${esc(r.text)}</p>` : ''}
-        </div>`).join('')
-    : '<p class="muted">لا توجد مراجعات محفوظة بعد</p>';
+          ${imgs ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px">${imgs}</div>` : ''}
+        </div>`;
+      }).join('')
+    : '<p class="muted">لا توجد مراجعات بتاريخ يوم العمل</p>';
 
   const approvalStamp = report.status === 'approved'
     ? `<div class="stamp approved">تقرير معتمد<small>اعتُمد بواسطة ${esc(report.approved_by_name || '—')} · ${esc(report.approved_at || '')}</small></div>`
@@ -289,7 +296,7 @@ router.get('/:date/print', requireAuth, (req, res) => {
     <h2>الملاحظات اليومية</h2>
     ${notesHtml}
 
-    <h2>مراجعات قوقل ماب${reviewStats.count ? ` <small>المتوسط ${fmt.format(reviewStats.avg)} من ٥ · ${fmt.format(reviewStats.count)} مراجعة</small>` : ''}</h2>
+    <h2>مراجعات قوقل ماب — يوم ${esc(date)} <small>(${fmt.format(latestReviews.length)})${reviewStats.count ? ` · المتوسط العام ${fmt.format(reviewStats.avg)} من ٥` : ''}</small></h2>
     ${reviewsHtml}
 
     ${approvalStamp}

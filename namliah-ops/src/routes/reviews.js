@@ -16,28 +16,36 @@ function reqBranch(req) {
   return BRANCHES[b] ? b : 'all';
 }
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 router.get('/', (req, res) => {
   const branch = reqBranch(req);
   const sentiment = ['positive', 'neutral', 'negative'].includes(req.query.sentiment)
     ? req.query.sentiment : null;
+  // فلتر يوم العمل: يعرض كل مراجعات ذلك اليوم بلا ترقيم صفحات
+  const date = DATE_RE.test(req.query.date || '') ? req.query.date : null;
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const conds = [];
   const params = [];
   if (branch !== 'all') { conds.push('branch = ?'); params.push(branch); }
   if (sentiment) { conds.push('sentiment = ?'); params.push(sentiment); }
+  if (date) { conds.push('review_date = ?'); params.push(date); }
   const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
   const total = db.prepare(`SELECT COUNT(*) AS c FROM reviews ${where}`).get(...params).c;
+  const limit = date ? 200 : PAGE_SIZE;
+  const offset = date ? 0 : (page - 1) * PAGE_SIZE;
   const rows = db.prepare(`
     SELECT external_id, branch, author_name, author_photo_url, rating, text, review_date, photos, owner_reply, sentiment
     FROM reviews ${where}
     ORDER BY review_date DESC, id DESC
     LIMIT ? OFFSET ?
-  `).all(...params, PAGE_SIZE, (page - 1) * PAGE_SIZE);
+  `).all(...params, limit, offset);
   res.json({
-    page,
-    pages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+    page: date ? 1 : page,
+    pages: date ? 1 : Math.max(1, Math.ceil(total / PAGE_SIZE)),
     total,
     branch,
+    date,
     reviews: rows.map((r) => ({ ...r, photos: JSON.parse(r.photos || '[]') }))
   });
 });

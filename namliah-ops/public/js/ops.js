@@ -271,6 +271,9 @@ async function loadReport(date) {
 
   document.getElementById('exportBtn').href = `/report/${report.report_date}/print`;
   setLocked(report.status === 'approved' || isAdminViewer);
+
+  // مراجعات قوقل ليوم هذا التقرير
+  loadReviews().catch(() => {});
 }
 
 function collectNotes() {
@@ -286,24 +289,28 @@ function collectDeductionNotes() {
 }
 
 async function loadReviews() {
+  // مراجعات يوم العمل (تاريخ التقرير الحالي) — كلها، مع الصور
+  const dayParam = currentDate ? `&date=${currentDate}` : '';
   const [stats, list] = await Promise.all([
     api('/api/reviews/stats'),
-    api('/api/reviews?page=1')
+    api(`/api/reviews?page=1${dayParam}`)
   ]);
   const kpi = document.getElementById('kpiRating');
   const sub = document.getElementById('kpiRatingSub');
   if (stats.count > 0) {
-    kpi.innerHTML = `${nf.format(stats.avg_rating)} <small>من ٥ (${nf0.format(stats.count)})</small>`;
+    kpi.innerHTML = `${nf.format(stats.avg_rating)} <small>من ٥ (${nf0.format(stats.count)} إجمالاً)</small>`;
     sub.innerHTML = `<span class="up">${nf0.format(stats.positive)} إيجابي</span> · <span class="down">${nf0.format(stats.negative)} سلبي</span>`;
   } else {
     kpi.innerHTML = '<small>لا توجد مراجعات بعد</small>';
   }
-  document.getElementById('reviewsMeta').textContent = stats.configured
+  const syncInfo = stats.configured
     ? (stats.last_sync_at ? `آخر مزامنة: ${stats.last_sync_at.slice(0, 16).replace('T', ' ')}` : 'لم تتم مزامنة بعد')
     : 'المزامنة غير مُفعّلة (أضف APIFY_TOKEN)';
+  document.getElementById('reviewsMeta').textContent =
+    `مراجعات يوم ${currentDate || ''} (${nf0.format(list.total)}) · ${syncInfo}`;
   document.getElementById('reviewsStrip').innerHTML =
-    list.reviews.slice(0, 4).map(reviewCardHtml).join('') ||
-    '<p class="muted">لا توجد مراجعات محفوظة — جرّب المزامنة.</p>';
+    list.reviews.map(reviewCardHtml).join('') ||
+    `<p class="muted">لا توجد مراجعات بتاريخ يوم العمل ${currentDate || ''}. (اضغط «مزامنة الآن» لجلب الأحدث)</p>`;
   return stats;
 }
 
@@ -330,7 +337,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadTables();
   const dates = await loadDates();
   await loadReport(dates.length ? null : undefined);
-  loadReviews().catch(() => {});
 
   document.getElementById('dateSelect').addEventListener('change', (e) => loadReport(e.target.value));
 
