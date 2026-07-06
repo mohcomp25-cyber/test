@@ -48,8 +48,8 @@ function rand() {
 
 const insReport = db.prepare(`
   INSERT OR IGNORE INTO daily_reports
-    (branch, report_date, status, total_sales, orders_count, avg_ticket, payment_breakdown, channel_breakdown, deductions, deduction_notes, hall_sales, hourly_sales, first_order_at, last_order_at, approved_at, approved_by, is_demo)
-  VALUES ('jeddah', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    (branch, report_date, status, total_sales, orders_count, avg_ticket, payment_breakdown, channel_breakdown, deductions, deduction_notes, hall_sales, hourly_sales, first_order_at, last_order_at, actual_payments, approved_at, approved_by, is_demo)
+  VALUES ('jeddah', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
 `);
 const insLine = db.prepare(
   'INSERT INTO sales_lines (report_id, product_name, category, qty, unit_price, total) VALUES (?, ?, ?, ?, ?, ?)'
@@ -165,6 +165,15 @@ const seedTx = db.transaction(() => {
     const firstOrderAt = `12:${String(Math.floor(rand() * 20)).padStart(2, '0')}`;
     const lastOrderAt = `23:${String(30 + Math.floor(rand() * 25)).padStart(2, '0')}`;
 
+    // جرد فعلي تجريبي: مطابق غالباً مع فروقات صغيرة في بعض الأيام
+    const actualPayments = {};
+    if (rand() < 0.7) {
+      const variance = () => (rand() < 0.6 ? 0 : +((rand() - 0.5) * 60).toFixed(2));
+      actualPayments.cash = +(cash + variance()).toFixed(2);
+      actualPayments.card = +(card + variance()).toFixed(2);
+      actualPayments.online = online;
+    }
+
     const approved = i >= 2; // آخر يومين pending لتجربة الاعتماد
     const info = insReport.run(
       date,
@@ -178,6 +187,7 @@ const seedTx = db.transaction(() => {
       JSON.stringify(hourlySales),
       firstOrderAt,
       lastOrderAt,
+      JSON.stringify(actualPayments),
       approved ? `${date} 23:45:00` : null,
       approved ? opsUser.id : null
     );

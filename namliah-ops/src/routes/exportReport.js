@@ -125,6 +125,21 @@ router.get('/:date/print', requireAuth, (req, res) => {
         </div>`).join('')}
     </div>` : '';
 
+  // طرق الدفع الفعلية (جرد مدير التشغيل) مع الفروقات
+  const actualPayments = report.actual_payments || {};
+  const systemPayments = flatMix(report.payment_breakdown);
+  const actualKeys = Object.keys(systemPayments).filter((k) => actualPayments[k] != null);
+  const actualPaymentsHtml = actualKeys.length ? `
+    <h3 class="muted" style="margin:12px 0 4px">الجرد الفعلي والفروقات</h3>
+    ${actualKeys.map((k) => {
+      const sys = systemPayments[k] || 0;
+      const act = actualPayments[k];
+      const diff = +(act - sys).toFixed(2);
+      const cls = diff === 0 ? 'diff-ok' : diff < 0 ? 'diff-minus' : 'diff-plus';
+      const label_ = diff === 0 ? 'مطابق' : `${diff > 0 ? '+' : ''}${fmt.format(diff)} ر.س`;
+      return `<div class="mix-row"><span>${esc(label(k))} (فعلي)</span><b>${money(act)}</b><span class="pct ${cls}">${label_}</span></div>`;
+    }).join('')}` : '';
+
   const lines = report.lines || [];
   const topLines = lines.slice(0, 10);
   const bottomLines = lines.length > 10 ? lines.slice(-10).reverse() : [];
@@ -185,6 +200,9 @@ router.get('/:date/print', requireAuth, (req, res) => {
   .deductions{background:var(--bone);border:1px dashed var(--brass);border-radius:10px;padding:7px 14px;margin-top:10px;font-size:12.5px;color:var(--ink-soft)}
   .deductions b{color:var(--ink);font-variant-numeric:tabular-nums}
   .ded-note{color:var(--brass-deep);font-size:11.5px}
+  .diff-ok{color:var(--success);font-weight:700}
+  .diff-minus{color:var(--error);font-weight:700}
+  .diff-plus{color:#C57A1F;font-weight:700}
   .hours{display:flex;align-items:flex-end;gap:6px;background:#fff;border:1px solid var(--line-soft);border-radius:10px;padding:12px 14px 8px;overflow-x:auto}
   .hour-col{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:34px;flex:1}
   .hour-val{font-size:9.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
@@ -258,6 +276,7 @@ router.get('/:date/print', requireAuth, (req, res) => {
         <div class="mix-row"><span>استلام</span><b>${money((report.external_sales || {}).takeaway || 0)}</b><span class="pct"></span></div>
         <h3 class="muted" style="margin:12px 0 4px">طرق الدفع</h3>
         ${mixRows(report.payment_breakdown)}
+        ${actualPaymentsHtml}
       </div>
     </div>
 

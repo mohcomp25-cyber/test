@@ -50,13 +50,14 @@ router.get('/dates', (req, res) => {
   res.json(reports.listDates(reqBranch(req)));
 });
 
-// body: { notes: {customers,...}, deduction_notes: {coupons, discounts, cancellations} }
+// body: { notes: {customers,...}, deduction_notes: {coupons,...}, actual_payments: {cash, card, online} }
 router.put('/report/:date/notes', (req, res) => {
   const branch = reqBranch(req);
   const { date } = req.params;
   if (!reports.DATE_RE.test(date)) return res.status(400).json({ error: 'bad_date' });
   const notes = (req.body && req.body.notes) || {};
   const deductionNotes = (req.body && req.body.deduction_notes) || null;
+  const actualPayments = (req.body && req.body.actual_payments) || null;
   if (typeof notes !== 'object' || Array.isArray(notes)) {
     return res.status(400).json({ error: 'bad_notes' });
   }
@@ -67,6 +68,9 @@ router.put('/report/:date/notes', (req, res) => {
   }
   if (deductionNotes && typeof deductionNotes === 'object' && !Array.isArray(deductionNotes)) {
     reports.saveDeductionNotes(branch, date, req.session.userId, deductionNotes);
+  }
+  if (actualPayments && typeof actualPayments === 'object' && !Array.isArray(actualPayments)) {
+    reports.saveActualPayments(branch, date, req.session.userId, actualPayments);
   }
   res.json({ ok: true });
 });

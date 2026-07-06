@@ -167,6 +167,7 @@ function reportRowToJson(row) {
     external_sales: JSON.parse(row.channel_breakdown || '{}'),
     deductions: JSON.parse(row.deductions || '{}'),
     deduction_notes: JSON.parse(row.deduction_notes || '{}'),
+    actual_payments: JSON.parse(row.actual_payments || '{}'),
     hall_sales: JSON.parse(row.hall_sales || '[]'),
     hourly_sales: JSON.parse(row.hourly_sales || '[]'),
     first_order_at: row.first_order_at || null,
@@ -291,6 +292,27 @@ function saveDeductionNotes(branch, date, userId, notesObj) {
   return { ok: true };
 }
 
+// ---- طرق الدفع الفعلية (جرد مدير التشغيل لإظهار الفروقات) ----
+
+function saveActualPayments(branch, date, userId, obj) {
+  const report = db.prepare(
+    'SELECT id, status, actual_payments FROM daily_reports WHERE branch = ? AND report_date = ?'
+  ).get(branch, date);
+  if (!report) return { error: 'no_report' };
+  if (report.status === 'approved') return { error: 'report_already_approved' };
+  const current = JSON.parse(report.actual_payments || '{}');
+  for (const [key, raw] of Object.entries(obj || {})) {
+    if (!/^[a-z_][a-z0-9_]*$/i.test(key)) continue;
+    const val = raw === '' || raw == null ? null : Number(raw);
+    if (val == null || !isFinite(val)) delete current[key];
+    else current[key] = val;
+  }
+  db.prepare('UPDATE daily_reports SET actual_payments = ? WHERE id = ?')
+    .run(JSON.stringify(current), report.id);
+  audit('actual_payments_saved', userId, { branch, date });
+  return { ok: true };
+}
+
 // ---- admin aggregates ----
 
 function branchFilterSql(branch) {
@@ -412,6 +434,7 @@ module.exports = {
   NOTE_CATEGORIES,
   DEDUCTION_KEYS,
   saveDeductionNotes,
+  saveActualPayments,
   hourlyStats,
   riyadhToday,
   validatePayload,

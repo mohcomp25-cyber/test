@@ -114,6 +114,7 @@ addColumnIfMissing('daily_reports', 'deductions', "deductions TEXT NOT NULL DEFA
 addColumnIfMissing('daily_reports', 'hall_sales', "hall_sales TEXT NOT NULL DEFAULT '[]'");
 addColumnIfMissing('daily_reports', 'deduction_notes', "deduction_notes TEXT NOT NULL DEFAULT '{}'");
 addColumnIfMissing('daily_reports', 'hourly_sales', "hourly_sales TEXT NOT NULL DEFAULT '[]'");
+addColumnIfMissing('daily_reports', 'actual_payments', "actual_payments TEXT NOT NULL DEFAULT '{}'");
 addColumnIfMissing('daily_reports', 'first_order_at', 'first_order_at TEXT');
 addColumnIfMissing('daily_reports', 'last_order_at', 'last_order_at TEXT');
 addColumnIfMissing('notes', 'category', "category TEXT NOT NULL DEFAULT 'general'");

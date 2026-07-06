@@ -29,6 +29,7 @@ const DED_KEYS = ['coupons', 'discounts', 'cancellations'];
 function setLocked(locked) {
   NOTE_CATS.forEach((c) => { document.getElementById(`note-${c}`).disabled = locked; });
   DED_KEYS.forEach((k) => { document.getElementById(`dedNote-${k}`).disabled = locked; });
+  document.querySelectorAll('.actual-input').forEach((el) => { el.disabled = locked; });
   document.getElementById('saveNoteBtn').disabled = locked;
   const approveBtn = document.getElementById('approveBtn');
   approveBtn.disabled = locked;
@@ -73,6 +74,77 @@ function renderExternal(mix, reportTotal) {
   document.getElementById('pickupTotal').textContent = money(pickup);
   document.getElementById('pickupShare').textContent = reportTotal && pickup
     ? `${nf.format((pickup / reportTotal) * 100)}٪ من إجمالي المبيعات` : '';
+}
+
+// طرق الدفع الفعلية: جرد مدير التشغيل مقابل أرقام النظام — الفروقات تظهر مباشرة
+let systemPayments = {};
+
+function diffHtml(system, actualRaw) {
+  if (actualRaw === '' || actualRaw == null) return '<span class="pm-diff pm-diff--empty">—</span>';
+  const actual = Number(actualRaw);
+  if (!isFinite(actual)) return '<span class="pm-diff pm-diff--empty">—</span>';
+  const diff = +(actual - system).toFixed(2);
+  if (diff === 0) return '<span class="pm-diff pm-diff--zero">مطابق</span>';
+  const cls = diff < 0 ? 'pm-diff--minus' : 'pm-diff--plus';
+  const sign = diff > 0 ? '+' : '';
+  return `<span class="pm-diff ${cls}">${sign}${nf.format(diff)} ر.س</span>`;
+}
+
+function updateActualTotals() {
+  const totalEl = document.getElementById('actualTotal');
+  let sysSum = 0;
+  let actSum = 0;
+  let anyFilled = false;
+  document.querySelectorAll('.actual-row').forEach((row) => {
+    const key = row.dataset.key;
+    const input = row.querySelector('input');
+    row.querySelector('.pm-diff-cell').innerHTML = diffHtml(systemPayments[key] || 0, input.value);
+    // الإجماليات تقارن الطرق المعبأة فقط حتى لا تُحسب طريقة غير مجرودة كفرق
+    if (input.value !== '' && isFinite(Number(input.value))) {
+      sysSum += systemPayments[key] || 0;
+      actSum += Number(input.value);
+      anyFilled = true;
+    }
+  });
+  if (!anyFilled) { totalEl.innerHTML = ''; return; }
+  const diff = +(actSum - sysSum).toFixed(2);
+  const cls = diff === 0 ? 'pm-diff--zero' : diff < 0 ? 'pm-diff--minus' : 'pm-diff--plus';
+  const sign = diff > 0 ? '+' : '';
+  totalEl.innerHTML = `
+    <span>إجمالي الفعلي: <span class="num">${money(actSum)}</span></span>
+    <span>إجمالي الفرق: <span class="pm-diff ${cls}">${diff === 0 ? 'مطابق' : `${sign}${nf.format(diff)} ر.س`}</span></span>`;
+}
+
+function renderActualPayments(report) {
+  systemPayments = flattenMix(report.payment_breakdown || {});
+  const actual = report.actual_payments || {};
+  const keys = Object.keys(systemPayments);
+  const container = document.getElementById('actualRows');
+  if (!keys.length) {
+    container.innerHTML = '<p class="muted">لا توجد طرق دفع واردة من الوورك فلو بعد.</p>';
+    document.getElementById('actualTotal').innerHTML = '';
+    return;
+  }
+  container.innerHTML = keys.map((k, i) => `
+    <div class="actual-row" data-key="${esc(k)}">
+      <span class="pm-name"><span class="dot" style="background:${CHART_COLORS[i % CHART_COLORS.length]}"></span>${esc(mixLabel(k))}</span>
+      <span class="pm-system">النظام: <b>${money(systemPayments[k])}</b></span>
+      <input class="input actual-input" type="number" step="0.01" min="0" inputmode="decimal"
+        placeholder="المبلغ الفعلي" value="${actual[k] != null ? actual[k] : ''}">
+      <span class="pm-diff-cell"></span>
+    </div>`).join('');
+  container.querySelectorAll('.actual-input').forEach((input) => {
+    input.addEventListener('input', updateActualTotals);
+  });
+  updateActualTotals();
+}
+
+function collectActualPayments() {
+  const out = {};
+  document.querySelectorAll('.actual-row').forEach((row) => {
+    out[row.dataset.key] = row.querySelector('input').value;
+  });
+  return out;
 }
 
 // المبيعات بالساعة: بطاقات الذروة/أول/آخر طلب + رسم أعمدة
@@ -175,6 +247,7 @@ async function loadReport(date) {
 
   // طرق الدفع المصغّرة + توزيع المبيعات
   renderChips(document.getElementById('paymentChips'), report.payment_breakdown);
+  renderActualPayments(report);
   renderHourly(report);
   renderWaiters(report.hall_sales || []);
   renderExternal(report.external_sales || {}, report.total_sales);
@@ -274,8 +347,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('saveNoteBtn').addEventListener('click', async () => {
     try {
-      await api(`/api/ops/report/${currentDate}/notes`, { method: 'PUT', body: { notes: collectNotes(), deduction_notes: collectDeductionNotes() } });
-      toast('تم حفظ الملاحظات');
+      await api(`/api/ops/report/${currentDate}/notes`, { method: 'PUT', body: { notes: collectNotes(), deduction_notes: collectDeductionNotes(), actual_payments: collectActualPayments() } });
+      toast('تم حفظ الملاحظات والجرد');
     } catch (err) { toast(err.message, true); }
   });
 
@@ -283,7 +356,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (currentStatus === 'approved') return;
     if (!confirm(`اعتماد تقرير يوم ${currentDate} ونشره للإدارة؟\nلا يمكن التعديل عليه بعد الاعتماد.`)) return;
     try {
-      await api(`/api/ops/report/${currentDate}/notes`, { method: 'PUT', body: { notes: collectNotes(), deduction_notes: collectDeductionNotes() } }).catch(() => {});
+      await api(`/api/ops/report/${currentDate}/notes`, { method: 'PUT', body: { notes: collectNotes(), deduction_notes: collectDeductionNotes(), actual_payments: collectActualPayments() } }).catch(() => {});
       const res = await api(`/api/ops/report/${currentDate}/approve`, { method: 'POST' });
       toast(res.message || 'تم الاعتماد');
       await loadDates();
