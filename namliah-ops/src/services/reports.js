@@ -76,8 +76,10 @@ const ingestTx = db.transaction((branch, body) => {
   const externalSales = { takeaway: extractTakeaway(s.external_sales || s.channel_breakdown) };
   const deductions = s.deductions || {};
   const hallSales = Array.isArray(s.hall_sales) ? s.hall_sales : [];
+  // ترتيب يوم العمل: يبدأ 06:00 صباحاً بحيث تأتي ساعات ما بعد منتصف الليل في نهاية اليوم لا بدايته
+  const dayIndex = (h) => (h - 6 + 24) % 24;
   const hourly = Array.isArray(s.hourly_sales)
-    ? [...s.hourly_sales].sort((a, b) => a.hour - b.hour)
+    ? [...s.hourly_sales].sort((a, b) => dayIndex(a.hour) - dayIndex(b.hour))
     : [];
   const activeHours = hourly.filter((h) => (h.total || 0) > 0 || (h.orders || 0) > 0);
   const pad = (n) => String(n).padStart(2, '0');
@@ -392,9 +394,10 @@ function dashboardData(branch, from, to) {
     }
   }
   const dayCount = Math.max(1, reports.length);
+  const hourIdx = (h) => (h - 6 + 24) % 24; // ترتيب يوم العمل (06:00 بداية اليوم)
   const hourlyMix = Object.entries(hourlyTotals)
     .map(([hour, total]) => ({ hour: Number(hour), avg_total: total / dayCount }))
-    .sort((a, b) => a.hour - b.hour);
+    .sort((a, b) => hourIdx(a.hour) - hourIdx(b.hour));
 
   const waiters = Object.entries(waiterTotals)
     .map(([waiter, total]) => ({ waiter, total }))

@@ -17,7 +17,7 @@ const money = (n) => `${fmt.format(n || 0)} ر.س`;
 
 const LABELS = {
   cash: 'نقدي', card: 'شبكة/بطاقة', online: 'دفع إلكتروني', other: 'أخرى',
-  dine_in: 'صالة', hall: 'صالة', takeaway: 'استلام',
+  dine_in: 'صالة', hall: 'صالة', takeaway: 'استلام', qlub: 'قلب (دفع QR)',
   coupons: 'كوبونات', discounts: 'خصومات', cancellations: 'إلغاءات'
 };
 const label = (k) => LABELS[k.split(':').pop()] || k.split(':').pop();
