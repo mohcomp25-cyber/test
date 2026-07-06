@@ -1,0 +1,23 @@
+# Caddy — بروكسي عكسي مع HTTPS تلقائي (شهادة Let's Encrypt مجانية)
+# ضع دومينك بدل ops.namliah.example.com ووجّه سجل A له نحو IP السيرفر.
+# ثم: sudo caddy reload --config /etc/caddy/Caddyfile
+
+ops.namliah.example.com {
+    reverse_proxy 127.0.0.1:3000
+
+    # ضغط الردود
+    encode gzip zstd
+
+    # هيدرات أمان أساسية
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    log {
+        output file /var/log/caddy/namliah-ops-access.log
+    }
+}
