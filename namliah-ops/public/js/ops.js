@@ -295,14 +295,23 @@ async function loadReviews() {
     api('/api/reviews/stats'),
     api(`/api/reviews?page=1${dayParam}`)
   ]);
+  // تقييم اليوم (مراجعات يوم التقرير) + التقييم العام
+  const dayReviews = list.reviews || [];
+  const dayAvg = dayReviews.length
+    ? dayReviews.reduce((a, r) => a + r.rating, 0) / dayReviews.length : null;
+  const dayPos = dayReviews.filter((r) => r.sentiment === 'positive').length;
+  const dayNeg = dayReviews.filter((r) => r.sentiment === 'negative').length;
   const kpi = document.getElementById('kpiRating');
   const sub = document.getElementById('kpiRatingSub');
-  if (stats.count > 0) {
-    kpi.innerHTML = `${nf.format(stats.avg_rating)} <small>من ٥ (${nf0.format(stats.count)} إجمالاً)</small>`;
-    sub.innerHTML = `<span class="up">${nf0.format(stats.positive)} إيجابي</span> · <span class="down">${nf0.format(stats.negative)} سلبي</span>`;
-  } else {
-    kpi.innerHTML = '<small>لا توجد مراجعات بعد</small>';
-  }
+  kpi.innerHTML = dayAvg != null
+    ? `${nf.format(dayAvg)} <small>اليوم من ٥ (${nf0.format(dayReviews.length)})</small>`
+    : '<small>لا مراجعات لهذا اليوم</small>';
+  const dayLine = dayReviews.length
+    ? `<span class="up">${nf0.format(dayPos)} إيجابي</span> · <span class="down">${nf0.format(dayNeg)} سلبي</span> — `
+    : '';
+  sub.innerHTML = stats.count > 0
+    ? `${dayLine}العام ${nf.format(stats.avg_rating)} من ٥ (${nf0.format(stats.count)})`
+    : 'لا توجد مراجعات بعد';
   const syncInfo = stats.configured
     ? (stats.last_sync_at ? `آخر مزامنة: ${stats.last_sync_at.slice(0, 16).replace('T', ' ')}` : 'لم تتم مزامنة بعد')
     : 'المزامنة غير مُفعّلة (أضف APIFY_TOKEN)';

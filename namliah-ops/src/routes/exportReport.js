@@ -296,7 +296,9 @@ router.get('/:date/print', requireAuth, (req, res) => {
     <h2>الملاحظات اليومية</h2>
     ${notesHtml}
 
-    <h2>مراجعات قوقل ماب — يوم ${esc(date)} <small>(${fmt.format(latestReviews.length)})${reviewStats.count ? ` · المتوسط العام ${fmt.format(reviewStats.avg)} من ٥` : ''}</small></h2>
+    <h2>مراجعات قوقل ماب — يوم ${esc(date)} <small>(${fmt.format(latestReviews.length)})${
+      latestReviews.length ? ` · تقييم اليوم ${fmt.format(latestReviews.reduce((a, r) => a + r.rating, 0) / latestReviews.length)} من ٥` : ''
+    }${reviewStats.count ? ` · العام ${fmt.format(reviewStats.avg)} من ٥` : ''}</small></h2>
     ${reviewsHtml}
 
     ${approvalStamp}
