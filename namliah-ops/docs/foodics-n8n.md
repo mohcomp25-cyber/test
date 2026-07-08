@@ -71,34 +71,45 @@ lines                   = أصناف Done من طلبات Done مجمعة بال
 
 ---
 
-## 3) بناء الوورك فلو في n8n
+## 3) بناء الوورك فلو في n8n (متعدد الفروع)
+
+الملفات الثلاثة **مدموجة تحتوي كل الفروع** (عمود `branch_name`: Jeddah / Abha…). الوورك فلو يقسّمها تلقائياً ويرسل كل فرع لمفتاحه.
 
 **العقد بالترتيب:**
 
-1. **Schedule Trigger** — يومياً 01:30 فجراً بتوقيت الرياض (بعد إقفال الوردية وقبل مزامنة المراجعات).
-2. **جلب الملفات الثلاثة** — بحسب طريقة وصولها:
-   - إن كانت تصل بريدياً: عقدة **Gmail/IMAP** بفلتر المرسل + Attachment.
-   - إن كانت من Foodics API/تصدير مجدول إلى مجلد: عقدة **HTTP Request** أو **Google Drive/FTP**.
-   - المهم أن تنتهي بثلاث Binary: orders / items / payments.
-3. **Extract From File** (×3) — نوع CSV، الترميز UTF-8 → يحول كل ملف إلى items.
-4. **Merge** — دمج المخرجات الثلاثة في مدخل واحد لعقدة الكود (أو مررها كمدخلات متعددة).
-5. **Code** — الصق دالة `transform` من `scripts/foodics-to-webhook.js` (القسم من `function transform` حتى نهايتها + دالة `num`)، ثم:
+1. **Schedule Trigger** — يومياً بعد نزول الملفات (مثلاً 04:30 فجراً بتوقيت الرياض).
+2. **جلب الملفات الثلاثة** حيث تنزل (Google Drive / بريد / FTP) → ثلاث Binary: orders / items / payments.
+3. **Extract From File** (×3) — CSV، UTF-8 → صفوف ككائنات.
+4. **Code** — الصق **كامل** `scripts/foodics-to-webhook.js` (كل الدوال: `num`، `transform`، `branchKey`، `transformByBranch`)، ثم في النهاية:
    ```js
-   const orders = $input.all().filter(...); // بحسب طريقة الدمج عندك
-   const payload = transform(ordersRows, itemsRows, paymentsRows, null);
-   return [{ json: payload }];
+   const orders   = $('Extract Orders').all().map(i => i.json);
+   const items    = $('Extract Items').all().map(i => i.json);
+   const payments = $('Extract Payments').all().map(i => i.json);
+   // يقسّم حسب الفرع ويعيد [{ key, name, payload }]
+   return transformByBranch(orders, items, payments, null)
+     .filter(g => g.payload.summary.orders_count > 0)
+     .map(g => ({ json: { branch: g.key, ...g.payload } }));
    ```
-   (إن استخدمت Extract From File فالصفوف تصلك جاهزة ككائنات — تجاوز parseCsv.)
-6. **HTTP Request** — POST إلى:
+   (تجاوز `parseCsv` — الصفوف تصل جاهزة من Extract From File.)
+5. **HTTP Request** (يعمل لكل عنصر = لكل فرع):
    - URL: `https://<الدومين>/api/webhook/sales`
-   - Header: `X-Webhook-Secret: {{ $env.WEBHOOK_SECRET_JEDDAH }}`
-   - Body: JSON = مخرجات عقدة الكود.
-7. **IF على الرد** — `200 created/updated` = نجاح. `409 report_already_approved` = اليوم معتمد (اعتبرها نجاحاً في إعادة المحاولة). غير ذلك → عقدة تنبيه (تيليجرام/بريد).
+   - Header: `X-Webhook-Secret: {{ $json.branch === 'abha' ? $env.WEBHOOK_SECRET_ABHA : $env.WEBHOOK_SECRET_JEDDAH }}`
+   - Body: JSON = `{{ $json }}` (بعد حذف حقل branch إن أردت، أو اتركه — المنصة تتجاهله وتعتمد الفرع من المفتاح).
+   - Settings → Continue On Fail = true (حتى لا يوقف فرعٌ بقية الفروع).
+6. **IF على الرد** — `200` نجاح · `409` اليوم معتمد (اعتبرها نجاحاً) · غير ذلك → تنبيه.
+
+**بديل أبسط بدون Code node:** شغّل السكربت مباشرة على السيرفر عبر عقدة **Execute Command**:
+```
+cd /opt/namliah-ops && node scripts/foodics-to-webhook.js \
+  --orders /path/orders.csv --items /path/items.csv --payments /path/payments.csv \
+  --post http://127.0.0.1:3000
+```
+السكربت يقرأ `WEBHOOK_SECRET_JEDDAH`/`_ABHA` من `.env` تلقائياً ويرسل كل فرع لمفتاحه.
 
 **ملاحظات تشغيلية:**
-- إعادة إرسال نفس اليوم آمنة تماماً قبل الاعتماد (تحديث كامل) ومرفوضة بعده (409).
-- الطلبات بعد منتصف الليل تحمل `business_date` اليوم السابق في فودكس نفسه — لا تحتاج معالجة.
-- لكل فرع مفتاحه (`WEBHOOK_SECRET_ABHA`…) — انسخ الوورك فلو وغيّر المفتاح فقط.
+- إعادة إرسال نفس اليوم آمنة قبل الاعتماد (تحديث كامل) ومرفوضة بعده (409).
+- الطلبات بعد منتصف الليل تحمل `business_date` اليوم السابق في فودكس نفسه — لا معالجة إضافية.
+- إضافة فرع جديد لاحقاً: يكفي أن يظهر `branch_name` في الملف + مفتاحه في `.env` — لا تعديل على الوورك فلو.
 
 ---
 

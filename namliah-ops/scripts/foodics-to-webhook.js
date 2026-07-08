@@ -159,10 +159,46 @@ function transform(orders, items, payments, forcedDate) {
   };
 }
 
+// اسم فرع فودكس → مفتاح الفرع في المنصة
+function branchKey(name) {
+  const n = (name || '').trim().toLowerCase();
+  if (n.includes('jeddah') || n.includes('جدة') || n.includes('جده')) return 'jeddah';
+  if (n.includes('abha') || n.includes('أبها') || n.includes('ابها')) return 'abha';
+  if (n.includes('makk') || n.includes('mecca') || n.includes('مكة') || n.includes('مكه')) return 'makkah';
+  return null;
+}
+
+// يقسّم الملفات المدموجة حسب الفرع ويبني حمولة لكل فرع
+function transformByBranch(orders, items, payments, forcedDate) {
+  const names = [...new Set(orders.map((o) => o.branch_name).filter(Boolean))];
+  const out = [];
+  if (!names.length) {
+    // لا عمود فرع → عامل الكل كجدة
+    out.push({ key: 'jeddah', name: null, payload: transform(orders, items, payments, forcedDate) });
+    return out;
+  }
+  for (const name of names) {
+    const key = branchKey(name);
+    if (!key) { console.warn(`تجاهل فرع غير معروف: ${name}`); continue; }
+    const flt = (rows) => rows.filter((r) => r.branch_name === name);
+    out.push({ key, name, payload: transform(flt(orders), flt(items), flt(payments), forcedDate) });
+  }
+  return out;
+}
+
 // ---- CLI ----
 function arg(name) {
   const i = process.argv.indexOf(`--${name}`);
   return i > -1 ? process.argv[i + 1] : null;
+}
+
+async function postPayload(postUrl, secret, payload) {
+  const res = await fetch(`${postUrl.replace(/\/$/, '')}/api/webhook/sales`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Webhook-Secret': secret || '' },
+    body: JSON.stringify(payload)
+  });
+  return { status: res.status, text: await res.text() };
 }
 
 async function main() {
@@ -170,10 +206,11 @@ async function main() {
   const itemsPath = arg('items');
   const paymentsPath = arg('payments');
   if (!ordersPath || !itemsPath || !paymentsPath) {
-    console.error('الاستخدام: node scripts/foodics-to-webhook.js --orders o.csv --items i.csv --payments p.csv [--date YYYY-MM-DD] [--post URL --secret SECRET]');
+    console.error('الاستخدام: node scripts/foodics-to-webhook.js --orders o.csv --items i.csv --payments p.csv [--date YYYY-MM-DD] [--post URL] [--secret S | --secret-jeddah S --secret-abha S]');
+    console.error('الملفات المدموجة متعددة الفروع تُقسَّم تلقائياً حسب branch_name، ويُرسل كل فرع لمفتاحه (WEBHOOK_SECRET_<BRANCH> من البيئة أو --secret-<branch>).');
     process.exit(1);
   }
-  const payload = transform(
+  const groups = transformByBranch(
     parseCsv(fs.readFileSync(ordersPath, 'utf8')),
     parseCsv(fs.readFileSync(itemsPath, 'utf8')),
     parseCsv(fs.readFileSync(paymentsPath, 'utf8')),
@@ -181,19 +218,24 @@ async function main() {
   );
 
   const postUrl = arg('post');
-  if (!postUrl) {
-    console.log(JSON.stringify(payload, null, 2));
-    return;
+  for (const g of groups) {
+    if (g.payload.summary.orders_count === 0) {
+      console.log(`فرع ${g.key}: لا طلبات مكتملة — تخطّي`);
+      continue;
+    }
+    if (!postUrl) {
+      console.log(`# فرع ${g.key} (${g.payload.summary.total_sales} ر.س):`);
+      console.log(JSON.stringify(g.payload, null, 2));
+      continue;
+    }
+    const secret = arg(`secret-${g.key}`)
+      || process.env[`WEBHOOK_SECRET_${g.key.toUpperCase()}`]
+      || arg('secret') || process.env.WEBHOOK_SECRET;
+    const r = await postPayload(postUrl, secret, g.payload);
+    console.log(`فرع ${g.key} (${g.payload.summary.total_sales} ر.س، ${g.payload.summary.orders_count} طلب) →`, r.status, r.text);
   }
-  const secret = arg('secret') || process.env.WEBHOOK_SECRET_JEDDAH || process.env.WEBHOOK_SECRET;
-  const res = await fetch(`${postUrl.replace(/\/$/, '')}/api/webhook/sales`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Webhook-Secret': secret || '' },
-    body: JSON.stringify(payload)
-  });
-  console.log(res.status, await res.text());
 }
 
 main().catch((err) => { console.error(err.message); process.exit(1); });
 
-module.exports = { parseCsv, transform };
+module.exports = { parseCsv, transform, transformByBranch, branchKey };
