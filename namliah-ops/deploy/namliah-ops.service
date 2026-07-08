@@ -1,0 +1,22 @@
+[Unit]
+Description=Namliah Ops Platform (منصة عمليات نملية)
+After=network.target
+
+[Service]
+Type=simple
+# عدّل المستخدم والمسار حسب سيرفرك
+User=namliah
+WorkingDirectory=/opt/namliah-ops
+EnvironmentFile=/opt/namliah-ops/.env
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=3
+# إعادة التشغيل تلقائياً عند الإقلاع، وحد أدنى من العزل الأمني
+NoNewPrivileges=true
+ProtectSystem=full
+ReadWritePaths=/opt/namliah-ops/data
+StandardOutput=append:/var/log/namliah-ops.log
+StandardError=append:/var/log/namliah-ops.log
+
+[Install]
+WantedBy=multi-user.target

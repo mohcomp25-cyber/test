@@ -1,0 +1,205 @@
+<!doctype html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مدير التشغيل — منصة عمليات نملية</title>
+<link rel="stylesheet" href="/css/fonts.css">
+<link rel="stylesheet" href="/css/brand.css">
+<link rel="icon" href="/img/logo-black.png">
+</head>
+<body>
+<header class="topbar">
+  <img class="brand-logo" src="/img/logo-cream.png" alt="نملية — مطعم من الريف اللبناني">
+  <span class="branch-badge" id="branchBadge"></span>
+  <div class="page-title">لوحة مدير التشغيل · التقرير اليومي</div>
+  <div class="spacer"></div>
+  <span class="user" id="userName"></span>
+  <button class="btn-logout" id="logoutBtn">تسجيل الخروج</button>
+</header>
+
+<main class="container">
+  <!-- شريط التحكم: التاريخ + الحالة + عدد الطاولات -->
+  <div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 20px">
+    <label class="field-label" for="dateSelect" style="margin:0">يوم التقرير</label>
+    <select class="select" id="dateSelect" style="width:auto;min-width:150px"></select>
+    <span id="statusBadge"></span>
+    <span style="display:inline-flex;align-items:center;gap:6px">
+      <label class="field-label" for="tablesCount" style="margin:0">عدد الطاولات</label>
+      <input class="input" id="tablesCount" type="number" min="1" max="500" style="width:76px;padding:5px 10px">
+      <button class="btn btn--outline btn--sm" id="saveTablesBtn">حفظ</button>
+    </span>
+    <div class="spacer" style="flex:1"></div>
+    <span class="muted" id="receivedAt"></span>
+  </div>
+
+  <div id="reportArea" style="display:none;flex-direction:column;gap:20px">
+    <!-- المؤشرات: بطاقة المبيعات الكبيرة + بقية المؤشرات -->
+    <section class="hero-grid">
+      <div class="kpi-card kpi-card--hero">
+        <div class="kpi-label">إجمالي المبيعات</div>
+        <div class="kpi-value kpi-value--hero" id="kpiSales"></div>
+        <div class="ded-list" id="dedList">
+          <div class="ded-row">
+            <span class="ded-name">كوبونات</span>
+            <b class="ded-amount" id="dedCoupons"></b>
+            <input class="input ded-note-input" id="dedNote-coupons" data-ded="coupons" placeholder="مثال: ٣ بلوقر">
+          </div>
+          <div class="ded-row">
+            <span class="ded-name">خصومات</span>
+            <b class="ded-amount" id="dedDiscounts"></b>
+            <input class="input ded-note-input" id="dedNote-discounts" data-ded="discounts" placeholder="مثال: خصم للمالك">
+          </div>
+          <div class="ded-row">
+            <span class="ded-name">إلغاءات</span>
+            <b class="ded-amount" id="dedCancellations"></b>
+            <input class="input ded-note-input" id="dedNote-cancellations" data-ded="cancellations" placeholder="مثال: إرجاع طلب فيه مشكلة">
+          </div>
+        </div>
+      </div>
+      <div class="kpi-grid kpi-grid--side">
+        <div class="kpi-card"><div class="kpi-label">عدد الطلبات</div><div class="kpi-value" id="kpiOrders"></div></div>
+        <div class="kpi-card"><div class="kpi-label">متوسط الفاتورة</div><div class="kpi-value" id="kpiAvg"></div></div>
+        <div class="kpi-card"><div class="kpi-label">متوسط مبيعات الطاولة</div><div class="kpi-value" id="kpiTableAvg"></div><div class="kpi-sub" id="kpiTableSub"></div></div>
+        <div class="kpi-card"><div class="kpi-label">تقييم قوقل ماب</div><div class="kpi-value" id="kpiRating"><small>—</small></div><div class="kpi-sub" id="kpiRatingSub"></div></div>
+      </div>
+    </section>
+
+    <!-- طرق الدفع — بطاقة مصغّرة -->
+    <section class="card" style="padding:12px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <h3 class="section-title" style="font-size:16px;margin:0">طرق الدفع</h3>
+      <div class="chips-row" id="paymentChips" style="flex:1"></div>
+    </section>
+
+    <!-- طرق الدفع الفعلية — جرد مدير التشغيل لإظهار الفروقات -->
+    <section class="card" style="padding:12px 20px">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:8px">
+        <h3 class="section-title" style="font-size:16px;margin:0">طرق الدفع الفعلية <small>جرد مدير التشغيل — الفروقات تظهر تلقائياً</small></h3>
+      </div>
+      <div class="actual-rows" id="actualRows"></div>
+      <div class="actual-total" id="actualTotal"></div>
+    </section>
+
+    <!-- المبيعات بالساعة -->
+    <section>
+      <h2 class="section-title" style="margin-bottom:12px">المبيعات بالساعة</h2>
+      <div class="hourly-grid">
+        <div class="hourly-kpis">
+          <div class="kpi-card"><div class="kpi-label">وقت الذروة</div><div class="kpi-value" id="kpiPeak">—</div><div class="kpi-sub" id="kpiPeakSub"></div></div>
+          <div class="kpi-card"><div class="kpi-label">أول طلب</div><div class="kpi-value" id="kpiFirstOrder">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">آخر طلب</div><div class="kpi-value" id="kpiLastOrder">—</div></div>
+        </div>
+        <div class="card chart-card">
+          <div class="chart-box" id="hourlyBox"><canvas id="hourlyChart"></canvas></div>
+          <p class="muted" id="hourlyEmpty" style="display:none;text-align:center;padding:30px 0">لم تصل بيانات المبيعات بالساعة من الوورك فلو بعد.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- توزيع المبيعات: الصالة عريضة + بطاقة استلام صغيرة ملاصقة -->
+    <section>
+      <h2 class="section-title" style="margin-bottom:12px">توزيع المبيعات</h2>
+      <div class="dist-grid">
+        <div class="card">
+          <h3 class="section-title" style="font-size:16px;margin-bottom:10px">مبيعات الصالة <small>حسب الويتر</small></h3>
+          <div class="table-wrap" style="border:0">
+            <table class="data-table">
+              <thead><tr><th>الويتر</th><th>المبيعات</th><th>النسبة</th></tr></thead>
+              <tbody id="waitersBody"></tbody>
+              <tfoot id="waitersFoot"></tfoot>
+            </table>
+          </div>
+        </div>
+        <div class="card pickup-card">
+          <h3 class="section-title" style="font-size:16px;margin-bottom:6px">الطلبات الخارجية</h3>
+          <div class="kpi-label">استلام</div>
+          <div class="kpi-value" id="pickupTotal">—</div>
+          <div class="kpi-sub" id="pickupShare"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- تفاصيل المبيعات: الأكثر والأقل مبيعاً -->
+    <section>
+      <h2 class="section-title" style="margin-bottom:12px">تفاصيل المبيعات <small id="linesCount"></small></h2>
+      <div class="charts-grid">
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="table-wrap" style="border:0">
+            <table class="data-table">
+              <thead><tr><th colspan="4" style="text-align:center;background:var(--nm-bottle-deep)">الأكثر مبيعاً — ١٠ أصناف</th></tr>
+              <tr><th>#</th><th>الصنف</th><th>الكمية</th><th>الإجمالي</th></tr></thead>
+              <tbody id="topLinesBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="table-wrap" style="border:0">
+            <table class="data-table">
+              <thead><tr><th colspan="4" style="text-align:center;background:var(--nm-terracotta)">الأقل مبيعاً — ١٠ أصناف</th></tr>
+              <tr><th>#</th><th>الصنف</th><th>الكمية</th><th>الإجمالي</th></tr></thead>
+              <tbody id="bottomLinesBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- الملاحظات المصنفة -->
+    <section>
+      <h2 class="section-title section-title--big" style="margin-bottom:14px">الملاحظات اليومية</h2>
+      <div class="notes-grid">
+        <div class="note-card note-card--customers">
+          <div class="note-card__head"><label for="note-customers">ملاحظات الزبائن وحلولها</label></div>
+          <textarea class="input note-card__body" id="note-customers" data-cat="customers" placeholder="شكاوى أو طلبات الزبائن وكيف عولجت…"></textarea>
+        </div>
+        <div class="note-card note-card--operations">
+          <div class="note-card__head"><label for="note-operations">ملاحظات تشغيلية</label></div>
+          <textarea class="input note-card__body" id="note-operations" data-cat="operations" placeholder="سير الوردية، الموظفون، الضغط…"></textarea>
+        </div>
+        <div class="note-card note-card--kitchen">
+          <div class="note-card__head"><label for="note-kitchen">ملاحظات المطبخ</label></div>
+          <textarea class="input note-card__body" id="note-kitchen" data-cat="kitchen" placeholder="الموردون، الجودة، التجهيز…"></textarea>
+        </div>
+        <div class="note-card note-card--maintenance">
+          <div class="note-card__head"><label for="note-maintenance">ملاحظات الصيانة</label></div>
+          <textarea class="input note-card__body" id="note-maintenance" data-cat="maintenance" placeholder="أعطال، صيانة دورية، معدات…"></textarea>
+        </div>
+        <div class="note-card note-card--general" style="grid-column:1/-1">
+          <div class="note-card__head"><label for="note-general">ملاحظات عامة</label></div>
+          <textarea class="input note-card__body" id="note-general" data-cat="general" placeholder="أي ملاحظات أخرى…"></textarea>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:12px">
+        <button class="btn btn--bottle" id="saveNoteBtn">حفظ الملاحظات</button>
+      </div>
+    </section>
+
+    <!-- مراجعات قوقل ماب -->
+    <section>
+      <h2 class="section-title" style="margin-bottom:12px">
+        مراجعات قوقل ماب
+        <small id="reviewsMeta"></small>
+        <button class="btn btn--outline btn--sm" id="syncReviewsBtn" style="margin-inline-start:auto">مزامنة الآن</button>
+      </h2>
+      <div class="reviews-grid" id="reviewsStrip"></div>
+    </section>
+
+    <!-- شريط الإجراءات -->
+    <div class="actions-bar">
+      <a class="btn btn--outline" id="exportBtn" target="_blank">تصدير / طباعة</a>
+      <button class="btn btn--brass" id="approveBtn">اعتماد التقرير ونشره للإدارة</button>
+    </div>
+  </div>
+
+  <div id="emptyState" class="empty-state" style="display:none">
+    <h3>لم تصل بيانات مبيعات بعد</h3>
+    <p class="muted">بمجرد أن يرسل الوورك فلو بيانات اليومية ستظهر هنا تلقائياً.</p>
+  </div>
+</main>
+
+<script src="/js/vendor/chart.umd.min.js"></script>
+<script src="/js/charts-theme.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/ops.js"></script>
+</body>
+</html>
