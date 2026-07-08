@@ -71,7 +71,45 @@ lines                   = أصناف Done من طلبات Done مجمعة بال
 
 ---
 
-## 3) بناء الوورك فلو في n8n (متعدد الفروع)
+## ⭐ الطريقة الموصى بها (n8n على سيرفر منفصل): ارفع الملفات مباشرة
+
+المنصة توفّر نقطة ترفع لها **الملفات الخام الثلاثة** وهي تتولى التحويل وتقسيم الفروع بالكامل — فلا حاجة لأي كود تحويل في n8n.
+
+```
+POST https://<الدومين>/api/webhook/foodics
+Header: X-Webhook-Secret: <FOODICS_UPLOAD_SECRET>
+Body: multipart/form-data
+      orders   = <ملف الطلبات>
+      items    = <ملف الأصناف>
+      payments = <ملف الدفعات>
+      date     = (اختياري) YYYY-MM-DD لتجاوز business_date
+```
+
+**الرد:**
+```json
+{ "ok": true, "branches": [
+  { "branch": "jeddah", "report_date": "2026-07-05", "total_sales": 30021, "orders_count": 157, "status": "created" },
+  { "branch": "abha",   "report_date": "2026-07-05", "total_sales": 619,   "orders_count": 5,   "status": "created" }
+]}
+```
+
+**وورك فلو n8n (٣ عقد فقط):**
+1. **Schedule Trigger** — يومياً بعد نزول الملفات (مثلاً 04:30 فجراً بتوقيت الرياض).
+2. **جلب الملفات الثلاثة** (Google Drive / بريد / FTP) → ٣ Binary.
+3. **HTTP Request**:
+   - Method: `POST` · URL: `https://<الدومين>/api/webhook/foodics`
+   - Headers: `X-Webhook-Secret` = `{{ $env.FOODICS_UPLOAD_SECRET }}`
+   - Body: **Form-Data / Multipart** → ٣ حقول من نوع «n8n Binary File»:
+     - `orders` → خاصية البيانات الثنائية لملف الطلبات
+     - `items` → للأصناف · `payments` → للدفعات
+
+هذا كل شيء — المنصة تقسّم جدة/أبها تلقائياً وترسل كل فرع لتقريره. عند بدء بيانات أبها فعلاً لا تحتاج تعديل شيء (فقط أنشئ حساب مديرها). ضع `FOODICS_UPLOAD_SECRET` في `.env` على السيرفر.
+
+> `X-Webhook-Secret` هنا هو **مفتاح الرفع الرئيسي** (`FOODICS_UPLOAD_SECRET`) لا مفتاح فرع — لأنه يرفع كل الفروع دفعة واحدة. احفظه سرياً ولا يمر إلا عبر HTTPS.
+
+---
+
+## بدائل (إن رغبت بالتحويل داخل n8n) — متعدد الفروع
 
 الملفات الثلاثة **مدموجة تحتوي كل الفروع** (عمود `branch_name`: Jeddah / Abha…). الوورك فلو يقسّمها تلقائياً ويرسل كل فرع لمفتاحه.
 

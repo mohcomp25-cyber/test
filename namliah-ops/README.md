@@ -141,7 +141,8 @@ X-Webhook-Secret: <مفتاح الفرع: WEBHOOK_SECRET_JEDDAH مثلاً>
 | المسار | الصلاحية | الوظيفة |
 |---|---|---|
 | `POST /api/auth/login` `logout` — `GET /api/auth/me` — `POST /api/auth/password` | — | الدخول والجلسات |
-| `POST /api/webhook/sales` | مفتاح سري | استقبال اليومية |
+| `POST /api/webhook/sales` | مفتاح فرع | استقبال حمولة يومية جاهزة (JSON) |
+| `POST /api/webhook/foodics` | مفتاح رفع | رفع ملفات فودكس الخام (multipart) — تحويل وتقسيم فروع تلقائي |
 | `GET /api/ops/report?date=` · `GET /api/ops/dates` | ops | عرض التقرير والأيام |
 | `PUT /api/ops/report/:date/notes` | ops | حفظ الملاحظات (قبل الاعتماد) |
 | `POST /api/ops/report/:date/approve` | ops | الاعتماد = النشر للإدارة (نهائي) |
