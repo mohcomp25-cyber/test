@@ -18,4 +18,5 @@ captures/
 Thumbs.db
 
 # Claude Code
-.claude/
+.claude/*
+!.claude/skills/
