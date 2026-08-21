@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مشاريعي</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f4f5f7; --card:#ffffff; --text:#1b1e23; --muted:#6b7280; --border:#e5e7eb;
+    --blue:#3b82f6; --amber:#f59e0b; --slate:#64748b; --green:#10b981; --red:#ef4444;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:'Tajawal',sans-serif; background:var(--bg); color:var(--text);
+    min-height:100vh; padding:20px;
+  }
+  .wrap{max-width:1200px;margin:0 auto;}
+  header{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    flex-wrap:wrap; margin-bottom:18px;
+  }
+  h1{font-size:22px; font-weight:900;}
+  .sub{color:var(--muted); font-size:13px; margin-top:2px;}
+  .actions{display:flex; gap:8px; flex-wrap:wrap;}
+  input[type=search]{
+    font-family:inherit; border:1.5px solid var(--border); border-radius:10px;
+    padding:9px 12px; font-size:14px; background:var(--card); min-width:180px;
+  }
+  .btn{
+    font-family:inherit; border:none; border-radius:10px; padding:9px 16px;
+    font-size:14px; font-weight:700; cursor:pointer; background:var(--text); color:#fff;
+  }
+  .btn:hover{opacity:.9;}
+  .board{
+    display:grid; grid-template-columns:repeat(4,1fr); gap:14px;
+  }
+  @media(max-width:900px){ .board{grid-template-columns:1fr;} }
+  .col{background:transparent;}
+  .col-head{
+    display:flex; align-items:center; gap:8px; padding:6px 4px 10px;
+  }
+  .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .col-title{font-weight:900; font-size:14px;}
+  .col-count{
+    background:var(--card); border:1px solid var(--border); border-radius:20px;
+    font-size:11px; color:var(--muted); padding:1px 8px; font-weight:700;
+  }
+  .col-cards{display:flex; flex-direction:column; gap:10px; min-height:40px;}
+  .empty{
+    color:var(--muted); font-size:12.5px; text-align:center; padding:16px 8px;
+    border:1.5px dashed var(--border); border-radius:12px;
+  }
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:14px;
+    padding:13px 14px; border-inline-start:4px solid var(--slate);
+    box-shadow:0 1px 2px rgba(0,0,0,.03);
+  }
+  .card-name{font-weight:800; font-size:14.5px; margin-bottom:3px;}
+  .card-desc{font-size:12.5px; color:var(--muted); line-height:1.5; margin-bottom:6px;}
+  .card-notes{
+    font-size:12px; color:#8a5a00; background:#fff7e6; border-radius:8px;
+    padding:6px 8px; margin-bottom:8px; line-height:1.5;
+  }
+  .card-link{font-size:12px; color:var(--blue); text-decoration:none; display:inline-block; margin-bottom:8px;}
+  .card-foot{
+    display:flex; align-items:center; justify-content:space-between; gap:6px;
+    margin-top:6px; padding-top:8px; border-top:1px dashed var(--border);
+  }
+  .card-date{font-size:11px; color:var(--muted);}
+  .card-tools{display:flex; align-items:center; gap:6px;}
+  select.status-pick{
+    font-family:inherit; font-size:11px; border:1px solid var(--border);
+    border-radius:8px; padding:3px 6px; background:var(--bg); color:var(--text); cursor:pointer;
+  }
+  .icon-btn{
+    border:none; background:none; cursor:pointer; font-size:13px; color:var(--muted);
+    padding:2px 5px; border-radius:6px;
+  }
+  .icon-btn:hover{background:var(--bg); color:var(--text);}
+  .local-tag{font-size:10px; color:var(--muted); border:1px dashed var(--border); border-radius:6px; padding:1px 5px;}
+
+  .overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.45); display:none;
+    align-items:center; justify-content:center; padding:16px; z-index:50;
+  }
+  .overlay.open{display:flex;}
+  .modal{
+    background:var(--card); border-radius:16px; padding:20px; width:100%; max-width:420px;
+    display:flex; flex-direction:column; gap:10px; max-height:90vh; overflow:auto;
+  }
+  .modal h2{font-size:16px; font-weight:900; margin-bottom:4px;}
+  .field label{display:block; font-size:12.5px; font-weight:700; margin-bottom:4px; color:var(--muted);}
+  .field input, .field select, .field textarea{
+    width:100%; font-family:inherit; border:1.5px solid var(--border); border-radius:10px;
+    padding:9px 10px; font-size:14px; background:var(--bg); color:var(--text);
+  }
+  .field textarea{resize:vertical; min-height:56px;}
+  .modal-actions{display:flex; gap:8px; margin-top:8px;}
+  .btn.ghost{background:var(--bg); color:var(--text); border:1.5px solid var(--border); flex:1;}
+  .btn.primary{flex:1;}
+  .btn.danger{background:var(--red);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>مشاريعي</h1>
+      <div class="sub">كل مشاريعك اللي شغّال عليها، لسا ما خلصتها، أو تبيلها تعديل — في مكان واحد</div>
+    </div>
+    <div class="actions">
+      <input type="search" id="search" placeholder="بحث..." oninput="render()">
+      <button class="btn" onclick="openModal()">+ مشروع جديد</button>
+    </div>
+  </header>
+
+  <div class="board" id="board"></div>
+</div>
+
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h2 id="modalTitle">مشروع جديد</h2>
+    <input type="hidden" id="f_id">
+    <input type="hidden" id="f_source">
+    <div class="field">
+      <label>اسم المشروع</label>
+      <input id="f_name" placeholder="مثال: تطبيق كذا">
+    </div>
+    <div class="field">
+      <label>الحالة</label>
+      <select id="f_status"></select>
+    </div>
+    <div class="field">
+      <label>وصف قصير</label>
+      <textarea id="f_desc" placeholder="عن ايش المشروع بجملة أو جملتين"></textarea>
+    </div>
+    <div class="field">
+      <label>ملاحظات / وين وقفت</label>
+      <textarea id="f_notes" placeholder="مثال: باقي أربط الدفع، أو واقف على خطأ كذا"></textarea>
+    </div>
+    <div class="field">
+      <label>رابط (اختياري)</label>
+      <input id="f_link" placeholder="رابط المستودع أو المجلد">
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="closeModal()">إلغاء</button>
+      <button class="btn primary" onclick="saveProject()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// المصدر الدائم للمشاريع — هذا الجزء يعدّله السكيل (project-tracker) عند إضافة مشروع جديد بشكل دائم.
+const BASE_PROJECTS = [
+  {id:'dlvr-app', name:'DLVR', status:'in_progress', description:'تطبيق مسح وتصوير فواتير الطلبات ورفعها تلقائيًا لشيت جوجل.', notes:'', link:'../index.html', updatedAt:'2026-08-21'},
+];
+
+const STATUSES = [
+  {key:'in_progress', label:'قيد التنفيذ', color:'var(--blue)'},
+  {key:'needs_edit', label:'يحتاج تعديل', color:'var(--amber)'},
+  {key:'stalled', label:'متوقف', color:'var(--slate)'},
+  {key:'done', label:'مكتمل', color:'var(--green)'},
+];
+
+const OV_KEY = 'pt_overrides';
+const EX_KEY = 'pt_extra';
+
+function loadJSON(key, fallback){
+  try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+  catch(e){ return fallback; }
+}
+function saveJSON(key, val){
+  try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){}
+}
+
+function getOverrides(){ return loadJSON(OV_KEY, {}); }
+function setOverrides(o){ saveJSON(OV_KEY, o); }
+function getExtra(){ return loadJSON(EX_KEY, []); }
+function setExtra(list){ saveJSON(EX_KEY, list); }
+
+function today(){ return new Date().toISOString().slice(0,10); }
+
+function getAllProjects(){
+  const overrides = getOverrides();
+  const base = BASE_PROJECTS.map(p => {
+    const ov = overrides[p.id];
+    if(!ov) return {...p, _source:'base'};
+    if(ov.deleted) return null;
+    return {...p, ...ov, _source:'base'};
+  }).filter(Boolean);
+  const extra = getExtra().filter(p => !p.deleted).map(p => ({...p, _source:'local'}));
+  return [...base, ...extra];
+}
+
+function slugify(name){
+  return 'p-' + name.trim().toLowerCase()
+    .replace(/[^a-z0-9؀-ۿ\s-]/g,'')
+    .replace(/\s+/g,'-')
+    .slice(0,40) + '-' + Math.random().toString(36).slice(2,6);
+}
+
+function render(){
+  const q = (document.getElementById('search').value || '').trim().toLowerCase();
+  const all = getAllProjects().filter(p => {
+    if(!q) return true;
+    return [p.name, p.description, p.notes].join(' ').toLowerCase().includes(q);
+  });
+
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+
+  STATUSES.forEach(st => {
+    const items = all.filter(p => p.status === st.key)
+      .sort((a,b) => (b.updatedAt||'').localeCompare(a.updatedAt||''));
+
+    const col = document.createElement('div');
+    col.className = 'col';
+    col.innerHTML = `
+      <div class="col-head">
+        <span class="dot" style="background:${st.color}"></span>
+        <span class="col-title">${st.label}</span>
+        <span class="col-count">${items.length}</span>
+      </div>
+      <div class="col-cards"></div>
+    `;
+    const cardsWrap = col.querySelector('.col-cards');
+
+    if(items.length === 0){
+      cardsWrap.innerHTML = '<div class="empty">ولا مشروع هنا</div>';
+    } else {
+      items.forEach(p => cardsWrap.appendChild(renderCard(p)));
+    }
+    board.appendChild(col);
+  });
+}
+
+function renderCard(p){
+  const st = STATUSES.find(s => s.key === p.status) || STATUSES[0];
+  const div = document.createElement('div');
+  div.className = 'card';
+  div.style.borderInlineStartColor = st.color;
+
+  const statusOptions = STATUSES.map(s =>
+    `<option value="${s.key}" ${s.key===p.status?'selected':''}>${s.label}</option>`
+  ).join('');
+
+  div.innerHTML = `
+    <div class="card-name">${escapeHtml(p.name)}</div>
+    ${p.description ? `<div class="card-desc">${escapeHtml(p.description)}</div>` : ''}
+    ${p.notes ? `<div class="card-notes">${escapeHtml(p.notes)}</div>` : ''}
+    ${p.link ? `<a class="card-link" href="${escapeAttr(p.link)}" target="_blank" rel="noopener">فتح الرابط ↗</a>` : ''}
+    <div class="card-foot">
+      <span class="card-date">${p.updatedAt || ''} ${p._source==='local' ? '<span class="local-tag">محلي</span>' : ''}</span>
+      <div class="card-tools">
+        <select class="status-pick" onchange="quickStatus('${p.id}','${p._source}',this.value)">${statusOptions}</select>
+        <button class="icon-btn" title="تعديل" onclick="openModal('${p.id}','${p._source}')">تعديل</button>
+        <button class="icon-btn" title="حذف" onclick="deleteProject('${p.id}','${p._source}')">حذف</button>
+      </div>
+    </div>
+  `;
+  return div;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeAttr(s){ return escapeHtml(s); }
+
+function quickStatus(id, source, newStatus){
+  const patch = {status:newStatus, updatedAt:today()};
+  if(source === 'base'){
+    const overrides = getOverrides();
+    overrides[id] = {...(overrides[id]||{}), ...patch};
+    setOverrides(overrides);
+  } else {
+    const extra = getExtra();
+    const idx = extra.findIndex(p => p.id === id);
+    if(idx > -1){ extra[idx] = {...extra[idx], ...patch}; setExtra(extra); }
+  }
+  render();
+}
+
+function deleteProject(id, source){
+  if(!confirm('تحذف المشروع من الصفحة؟')) return;
+  if(source === 'base'){
+    const overrides = getOverrides();
+    overrides[id] = {...(overrides[id]||{}), deleted:true};
+    setOverrides(overrides);
+  } else {
+    const extra = getExtra().filter(p => p.id !== id);
+    setExtra(extra);
+  }
+  render();
+}
+
+function openModal(id, source){
+  const sel = document.getElementById('f_status');
+  sel.innerHTML = STATUSES.map(s => `<option value="${s.key}">${s.label}</option>`).join('');
+
+  let p = null;
+  if(id){
+    p = getAllProjects().find(x => x.id === id && x._source === source);
+  }
+
+  document.getElementById('modalTitle').textContent = p ? 'تعديل مشروع' : 'مشروع جديد';
+  document.getElementById('f_id').value = p ? p.id : '';
+  document.getElementById('f_source').value = p ? p._source : '';
+  document.getElementById('f_name').value = p ? p.name : '';
+  document.getElementById('f_status').value = p ? p.status : 'in_progress';
+  document.getElementById('f_desc').value = p ? (p.description||'') : '';
+  document.getElementById('f_notes').value = p ? (p.notes||'') : '';
+  document.getElementById('f_link').value = p ? (p.link||'') : '';
+
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('f_name').focus();
+}
+
+function closeModal(){
+  document.getElementById('overlay').classList.remove('open');
+}
+
+function saveProject(){
+  const name = document.getElementById('f_name').value.trim();
+  if(!name){ alert('لازم اسم للمشروع'); return; }
+
+  const id = document.getElementById('f_id').value;
+  const source = document.getElementById('f_source').value;
+  const data = {
+    name,
+    status: document.getElementById('f_status').value,
+    description: document.getElementById('f_desc').value.trim(),
+    notes: document.getElementById('f_notes').value.trim(),
+    link: document.getElementById('f_link').value.trim(),
+    updatedAt: today(),
+  };
+
+  if(id && source === 'base'){
+    const overrides = getOverrides();
+    overrides[id] = {...(overrides[id]||{}), ...data};
+    setOverrides(overrides);
+  } else if(id && source === 'local'){
+    const extra = getExtra();
+    const idx = extra.findIndex(p => p.id === id);
+    if(idx > -1) extra[idx] = {...extra[idx], ...data};
+    setExtra(extra);
+  } else {
+    const extra = getExtra();
+    extra.push({id: slugify(name), ...data});
+    setExtra(extra);
+  }
+
+  closeModal();
+  render();
+}
+
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeModal(); });
+
+render();
+</script>
+</body>
+</html>
