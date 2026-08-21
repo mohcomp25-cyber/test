@@ -78,7 +78,6 @@
     padding:2px 5px; border-radius:6px;
   }
   .icon-btn:hover{background:var(--bg); color:var(--text);}
-  .local-tag{font-size:10px; color:var(--muted); border:1px dashed var(--border); border-radius:6px; padding:1px 5px;}
 
   .overlay{
     position:fixed; inset:0; background:rgba(0,0,0,.45); display:none;
@@ -122,7 +121,6 @@
   <div class="modal">
     <h2 id="modalTitle">مشروع جديد</h2>
     <input type="hidden" id="f_id">
-    <input type="hidden" id="f_source">
     <div class="field">
       <label>اسم المشروع</label>
       <input id="f_name" placeholder="مثال: تطبيق كذا">
@@ -151,8 +149,11 @@
 </div>
 
 <script>
-// المصدر الدائم للمشاريع — هذا الجزء يعدّله السكيل (project-tracker) عند إضافة مشروع جديد بشكل دائم.
-const BASE_PROJECTS = [
+// بذرة أولية — تُستخدم مرة وحدة عشان تعبّي متصفحك أول ما تفتح الصفحة، ثم يصير كل شي
+// محفوظ عندك محليًا (localStorage) وما له علاقة بأي سيرفر أو GitHub بعدها.
+// هذا الجزء يعدّله السكيل (project-tracker) لما يضيف مشروع جديد — يظهر عندك تلقائيًا
+// أول ما تفتح/تحدّث الصفحة، بدون ما تسوي شي.
+const SEED_PROJECTS = [
   {id:'dlvr-app', name:'DLVR', status:'in_progress', description:'تطبيق مسح وتصوير فواتير الطلبات ورفعها تلقائيًا لشيت جوجل.', notes:'', link:'../index.html', updatedAt:'2026-08-21'},
 ];
 
@@ -163,8 +164,8 @@ const STATUSES = [
   {key:'done', label:'مكتمل', color:'var(--green)'},
 ];
 
-const OV_KEY = 'pt_overrides';
-const EX_KEY = 'pt_extra';
+const DATA_KEY = 'pt_projects';
+const SEEDED_KEY = 'pt_seeded_ids';
 
 function loadJSON(key, fallback){
   try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
@@ -174,24 +175,29 @@ function saveJSON(key, val){
   try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){}
 }
 
-function getOverrides(){ return loadJSON(OV_KEY, {}); }
-function setOverrides(o){ saveJSON(OV_KEY, o); }
-function getExtra(){ return loadJSON(EX_KEY, []); }
-function setExtra(list){ saveJSON(EX_KEY, list); }
-
 function today(){ return new Date().toISOString().slice(0,10); }
 
-function getAllProjects(){
-  const overrides = getOverrides();
-  const base = BASE_PROJECTS.map(p => {
-    const ov = overrides[p.id];
-    if(!ov) return {...p, _source:'base'};
-    if(ov.deleted) return null;
-    return {...p, ...ov, _source:'base'};
-  }).filter(Boolean);
-  const extra = getExtra().filter(p => !p.deleted).map(p => ({...p, _source:'local'}));
-  return [...base, ...extra];
+// يدمج أي مشروع جديد من SEED_PROJECTS لأول مرة فقط (ما يرجع مشروع حذفته أنت بنفسك).
+function mergeSeed(){
+  const projects = loadJSON(DATA_KEY, []);
+  const seeded = new Set(loadJSON(SEEDED_KEY, []));
+  let changed = false;
+  SEED_PROJECTS.forEach(p => {
+    if(!seeded.has(p.id)){
+      projects.push({...p});
+      seeded.add(p.id);
+      changed = true;
+    }
+  });
+  if(changed){
+    saveJSON(DATA_KEY, projects);
+    saveJSON(SEEDED_KEY, [...seeded]);
+  }
+  return projects;
 }
+
+function getAllProjects(){ return loadJSON(DATA_KEY, []); }
+function setAllProjects(list){ saveJSON(DATA_KEY, list); }
 
 function slugify(name){
   return 'p-' + name.trim().toLowerCase()
@@ -251,11 +257,11 @@ function renderCard(p){
     ${p.notes ? `<div class="card-notes">${escapeHtml(p.notes)}</div>` : ''}
     ${p.link ? `<a class="card-link" href="${escapeAttr(p.link)}" target="_blank" rel="noopener">فتح الرابط ↗</a>` : ''}
     <div class="card-foot">
-      <span class="card-date">${p.updatedAt || ''} ${p._source==='local' ? '<span class="local-tag">محلي</span>' : ''}</span>
+      <span class="card-date">${p.updatedAt || ''}</span>
       <div class="card-tools">
-        <select class="status-pick" onchange="quickStatus('${p.id}','${p._source}',this.value)">${statusOptions}</select>
-        <button class="icon-btn" title="تعديل" onclick="openModal('${p.id}','${p._source}')">تعديل</button>
-        <button class="icon-btn" title="حذف" onclick="deleteProject('${p.id}','${p._source}')">حذف</button>
+        <select class="status-pick" onchange="quickStatus('${p.id}',this.value)">${statusOptions}</select>
+        <button class="icon-btn" title="تعديل" onclick="openModal('${p.id}')">تعديل</button>
+        <button class="icon-btn" title="حذف" onclick="deleteProject('${p.id}')">حذف</button>
       </div>
     </div>
   `;
@@ -267,45 +273,30 @@ function escapeHtml(s){
 }
 function escapeAttr(s){ return escapeHtml(s); }
 
-function quickStatus(id, source, newStatus){
-  const patch = {status:newStatus, updatedAt:today()};
-  if(source === 'base'){
-    const overrides = getOverrides();
-    overrides[id] = {...(overrides[id]||{}), ...patch};
-    setOverrides(overrides);
-  } else {
-    const extra = getExtra();
-    const idx = extra.findIndex(p => p.id === id);
-    if(idx > -1){ extra[idx] = {...extra[idx], ...patch}; setExtra(extra); }
+function quickStatus(id, newStatus){
+  const projects = getAllProjects();
+  const idx = projects.findIndex(p => p.id === id);
+  if(idx > -1){
+    projects[idx] = {...projects[idx], status:newStatus, updatedAt:today()};
+    setAllProjects(projects);
   }
   render();
 }
 
-function deleteProject(id, source){
+function deleteProject(id){
   if(!confirm('تحذف المشروع من الصفحة؟')) return;
-  if(source === 'base'){
-    const overrides = getOverrides();
-    overrides[id] = {...(overrides[id]||{}), deleted:true};
-    setOverrides(overrides);
-  } else {
-    const extra = getExtra().filter(p => p.id !== id);
-    setExtra(extra);
-  }
+  setAllProjects(getAllProjects().filter(p => p.id !== id));
   render();
 }
 
-function openModal(id, source){
+function openModal(id){
   const sel = document.getElementById('f_status');
   sel.innerHTML = STATUSES.map(s => `<option value="${s.key}">${s.label}</option>`).join('');
 
-  let p = null;
-  if(id){
-    p = getAllProjects().find(x => x.id === id && x._source === source);
-  }
+  const p = id ? getAllProjects().find(x => x.id === id) : null;
 
   document.getElementById('modalTitle').textContent = p ? 'تعديل مشروع' : 'مشروع جديد';
   document.getElementById('f_id').value = p ? p.id : '';
-  document.getElementById('f_source').value = p ? p._source : '';
   document.getElementById('f_name').value = p ? p.name : '';
   document.getElementById('f_status').value = p ? p.status : 'in_progress';
   document.getElementById('f_desc').value = p ? (p.description||'') : '';
@@ -325,7 +316,6 @@ function saveProject(){
   if(!name){ alert('لازم اسم للمشروع'); return; }
 
   const id = document.getElementById('f_id').value;
-  const source = document.getElementById('f_source').value;
   const data = {
     name,
     status: document.getElementById('f_status').value,
@@ -335,20 +325,14 @@ function saveProject(){
     updatedAt: today(),
   };
 
-  if(id && source === 'base'){
-    const overrides = getOverrides();
-    overrides[id] = {...(overrides[id]||{}), ...data};
-    setOverrides(overrides);
-  } else if(id && source === 'local'){
-    const extra = getExtra();
-    const idx = extra.findIndex(p => p.id === id);
-    if(idx > -1) extra[idx] = {...extra[idx], ...data};
-    setExtra(extra);
+  const projects = getAllProjects();
+  if(id){
+    const idx = projects.findIndex(p => p.id === id);
+    if(idx > -1) projects[idx] = {...projects[idx], ...data};
   } else {
-    const extra = getExtra();
-    extra.push({id: slugify(name), ...data});
-    setExtra(extra);
+    projects.push({id: slugify(name), ...data});
   }
+  setAllProjects(projects);
 
   closeModal();
   render();
@@ -356,6 +340,7 @@ function saveProject(){
 
 document.addEventListener('keydown', e => { if(e.key === 'Escape') closeModal(); });
 
+mergeSeed();
 render();
 </script>
 </body>
